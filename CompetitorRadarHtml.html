@@ -1,0 +1,3074 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Patent Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --sec: #64748b;
+            --bg: #f8fafc;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: #1e293b;
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        /* Control Panel */
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            align-items: end;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-group label {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: var(--sec);
+            margin-bottom: 5px;
+        }
+
+        input,
+        select {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        /* Range Slider Styling */
+        .range-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .range-container input {
+            width: 80px;
+        }
+
+        /* Chart */
+        #chart-div {
+            width: 100%;
+            height: 600px;
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        th {
+            background: #f1f5f9;
+            padding: 12px;
+            text-align: left;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th:hover {
+            background: #e2e8f0;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .badge {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 8px;
+            border-radius: 99px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .comp-openai {
+            color: #2563eb;
+            font-weight: bold;
+        }
+
+        .comp-anthropic {
+            color: #dc2626;
+            font-weight: bold;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            width: 70%;
+            max-height: 80vh;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 12px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            cursor: pointer;
+            font-size: 1.5em;
+        }
+
+        button.action-btn {
+            background: #f1f5f9;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin-right: 5px;
+            transition: 0.2s;
+        }
+
+        button.action-btn:hover {
+            background: #e2e8f0;
+        }
+
+        button.primary-btn {
+            background: var(--primary);
+            color: white;
+        }
+
+        button.primary-btn:hover {
+            background: #1d4ed8;
+        }
+
+        /* Tabs */
+        .tab-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 15px;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-weight: 600;
+            color: #64748b;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 1em;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        .tab-btn.active {
+            background: #dbeafe;
+            color: #2563eb;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .view-section {
+            display: none;
+            /* Hidden by default, JS toggles */
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Help Icons */
+        .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background: #f1f5f9;
+            color: #94a3b8;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 8px;
+            transition: all 0.2s;
+            vertical-align: middle;
+            border: 1px solid #e2e8f0;
+            padding: 0;
+        }
+
+        .help-icon:hover {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        .help-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .help-card {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .help-label {
+            font-weight: bold;
+            color: #475569;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        /* Extended Tech Block */
+        .tech-block {
+            margin-top: 20px;
+            padding: 15px;
+            background: #0f172a;
+            color: #e2e8f0;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            display: none;
+            overflow-x: auto;
+            border-left: 4px solid #10b981;
+        }
+
+        .tech-step {
+            margin-bottom: 12px;
+            border-bottom: 1px solid #1e293b;
+            padding-bottom: 8px;
+        }
+
+        .tech-step:last-child {
+            border-bottom: none;
+        }
+
+        .tech-tag {
+            color: #38bdf8;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>⚔️ OpenAI vs Anthropic: Strategic Radar</h1>
+            <p style="color:#64748b; font-size:0.9em;">
+                Updated: <span id="last-updated">...</span> •
+                <span id="total-count">0</span> Patents Analyzed
+            </p>
+        </div>
+
+
+
+        <!-- TAB NAVIGATION -->
+        <div class="tab-nav">
+            <button id="btn-overview" class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
+            <button id="btn-anthropic" class="tab-btn" onclick="switchTab('anthropic')">🔴 Anthropic</button>
+            <button id="btn-openai" class="tab-btn" onclick="switchTab('openai')">🔵 OpenAI</button>
+            <button id="btn-positioning" class="tab-btn" onclick="switchTab('positioning')">🌎 Map & Overlay</button>
+            <button id="btn-skills" class="tab-btn" onclick="switchTab('skills')">📊 Topic Distribution</button>
+            <button id="btn-trends" class="tab-btn" onclick="switchTab('trends')">📈 Trends</button>
+            <button id="btn-swot-all" class="tab-btn" onclick="switchTab('swot-all')">🧠 SWOT</button>
+            <button id="btn-wordcloud" class="tab-btn" onclick="switchTab('wordcloud')">☁️ Word Cloud</button>
+            <button id="btn-opportunity" class="tab-btn" onclick="switchTab('opportunity')">🚀 Opportunities</button>
+            <button id="btn-comparison" class="tab-btn" onclick="switchTab('comparison')">⚖️ Detailed Analysis</button>
+        </div>
+
+        <!-- GLOBAL CONTROLS (Visible for List & Positioning) -->
+        <div class="controls" id="global-controls">
+            <div class="control-group">
+                <label>📅 Application Year Range</label>
+                <div class="range-container">
+                    <input type="number" id="yearMin" value="2015" min="2000" max="2026" onchange="updateDashboard()">
+                    <span>to</span>
+                    <input type="number" id="yearMax" value="2026" min="2000" max="2026" onchange="updateDashboard()">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>🔍 Title Contains</label>
+                <input type="text" id="searchTitle" placeholder="e.g. transformer, attention..."
+                    onkeyup="updateDashboard()">
+            </div>
+
+            <div class="control-group">
+                <label>🏷️ Filter by Topic</label>
+                <select id="topicSelect" onchange="updateDashboard()">
+                    <option value="ALL">All Topics</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>👨🔬 Inventor Name</label>
+                <input type="text" id="searchInv" placeholder="e.g. Sutskever..." onkeyup="updateDashboard()">
+            </div>
+
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <!-- [REMOVED] Apply Filters Button - Updates are automatic -->
+                <button class="action-btn primary-btn" onclick="resetFilters()" style="background:#ef4444;">Reset
+                    All</button>
+            </div>
+        </div>
+
+        <!-- VIEW: LIST (Overview, Anthropic, OpenAI) -->
+        <div id="view-list" class="view-section" style="display:block;">
+            <div class="card">
+                <h3>🏆 Inventors & Stats</h3>
+                <div id="inventor-chart" style="width:100%; height:400px;"></div>
+            </div>
+
+            <!-- SWOT ANALYSIS SECTION -->
+            <div class="card" id="swot-card" style="display:none; border-left:4px solid #8b5cf6;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <h3 style="margin:0;">🧠 Strategic SWOT Analysis</h3>
+                        <p style="margin:5px 0 0 0; color:#64748b; font-size:0.9em;">
+                            AI-generated analysis of the patent portfolio using Mistral Large.
+                        </p>
+                    </div>
+                    <button class="action-btn primary-btn" id="btn-swot" onclick="triggerSWOT()">
+                        ✨ Generate SWOT
+                    </button>
+                </div>
+                <div id="swot-result" style="margin-top:20px; display:none;">
+                    <!-- 2x2 Grid -->
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                        <div class="swot-box" style="background:#f0fdf4; border:1px solid #bbf7d0;">
+                            <h4 style="color:#166534;">💪 Strengths</h4>
+                            <ul id="swot-s" style="padding-left:20px; color:#14532d;"></ul>
+                        </div>
+                        <div class="swot-box" style="background:#fef2f2; border:1px solid #fecaca;">
+                            <h4 style="color:#991b1b;">🔻 Weaknesses</h4>
+                            <ul id="swot-w" style="padding-left:20px; color:#7f1d1d;"></ul>
+                        </div>
+                        <div class="swot-box" style="background:#eff6ff; border:1px solid #bfdbfe;">
+                            <h4 style="color:#1e40af;">🌟 Opportunities</h4>
+                            <ul id="swot-o" style="padding-left:20px; color:#1e3a8a;"></ul>
+                        </div>
+                        <div class="swot-box" style="background:#fff7ed; border:1px solid #fed7aa;">
+                            <h4 style="color:#9a3412;">⚠️ Threats</h4>
+                            <ul id="swot-t" style="padding-left:20px; color:#7c2d12;"></ul>
+                        </div>
+                    </div>
+                    <div style="text-align:right; margin-top:10px; font-size:0.8em; color:#94a3b8;">
+                        Generated by Mistral Large • <span id="swot-time"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card table-container">
+                <h3>📄 Patent Registry <button class="help-icon" onclick="showHelp('proximity')">?</button></h3>
+                <table id="patentTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable('AppDate')">Date ↕</th>
+                            <th onclick="sortTable('Company')">Company ↕</th>
+                            <th onclick="sortTable('Title')">Title ↕</th>
+                            <th onclick="sortTable('Topic')">Topic ↕</th>
+                            <th>Inventors</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+                <div style="text-align:center; padding:10px; color:#64748b;" id="countDisplay"></div>
+            </div>
+        </div>
+
+        <!-- VIEW: POSITIONING (Map) -->
+        <div id="view-positioning" class="view-section">
+            <div class="card">
+                <h3>🌎 Strategic Landscape (Map) <button class="help-icon" onclick="showHelp('radar')">?</button></h3>
+                <p style="color:#64748b; font-size:0.9em; margin-bottom:15px;">
+                    Visualizing semantic similarity. Closer points represent more similar patents.
+                </p>
+                <div id="chart-div"></div>
+            </div>
+        </div>
+
+        <!-- VIEW: SKILLS (RADAR) -->
+        <div id="view-skills" class="view-section">
+            <div class="card">
+                <h3>🕸️ Technical Competence Radar <button class="help-icon" onclick="showHelp('skills')">?</button>
+                </h3>
+                <p style="color:#64748b; font-size:0.9em; margin-bottom:15px;">
+                    Comparing patent density across key technology domains.
+                </p>
+                <div id="radar-chart" style="width:100%; height:600px;"></div>
+            </div>
+        </div>
+
+        <!-- VIEW: TRENDS (Time Series) -->
+        <div id="view-trends" class="view-section">
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <div>
+                        <h3>📈 Topic Trends (2015-2025)</h3>
+                        <p style="color:#64748b; font-size:0.9em; margin:0;">
+                            Visualizing the evolution of key technology topics over time.
+                        </p>
+                    </div>
+
+                    <!-- COMPANY TOGGLES -->
+                    <div
+                        style="background:#f8fafc; padding:8px 16px; border-radius:8px; border:1px solid #e2e8f0; display:flex; gap:15px;">
+                        <label
+                            style="cursor:pointer; font-weight:600; color:#2563eb; display:flex; align-items:center; gap:5px;">
+                            <input type="checkbox" id="trend-openai" checked onchange="updateTrendChart()"> OpenAI
+                        </label>
+                        <label
+                            style="cursor:pointer; font-weight:600; color:#dc2626; display:flex; align-items:center; gap:5px;">
+                            <input type="checkbox" id="trend-anthropic" checked onchange="updateTrendChart()"> Anthropic
+                        </label>
+                        <label
+                            style="cursor:pointer; font-weight:600; color:#10b981; display:flex; align-items:center; gap:5px;">
+                            <input type="checkbox" id="trend-mistral" checked onchange="updateTrendChart()"> Mistral
+                            (Int)
+                        </label>
+                    </div>
+                </div>
+                <div id="trend-chart" style="width:100%; height:600px;"></div>
+            </div>
+        </div>
+
+        <!-- VIEW: SWOT (Dedicated) -->
+        <div id="view-swot-all" class="view-section">
+            <div style="display:grid; grid-template-columns: 1fr; gap:20px;">
+
+                <!-- Mistral -->
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>🟩 Mistral SWOT <button class="help-icon" onclick="showHelp('swot')">?</button></h3>
+                        <button id="btn-swot-mistral" class="action-btn"
+                            onclick="triggerSWOT('Mistral', 'swot-result-mistral', this)">✨ Generate</button>
+                    </div>
+                    <div id="swot-result-mistral" style="display:none; margin-top:15px;"></div>
+                </div>
+
+                <!-- OpenAI -->
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>🟦 OpenAI SWOT <button class="help-icon" onclick="showHelp('swot')">?</button></h3>
+                        <button id="btn-swot-openai" class="action-btn"
+                            onclick="triggerSWOT('OpenAI', 'swot-result-openai', this)">✨ Generate</button>
+                    </div>
+                    <div id="swot-result-openai" style="display:none; margin-top:15px;"></div>
+                </div>
+
+                <!-- Anthropic -->
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>🟥 Anthropic SWOT <button class="help-icon" onclick="showHelp('swot')">?</button></h3>
+                        <button id="btn-swot-anthropic" class="action-btn"
+                            onclick="triggerSWOT('Anthropic', 'swot-result-anthropic', this)">✨ Generate</button>
+                    </div>
+                    <div id="swot-result-anthropic" style="display:none; margin-top:15px;"></div>
+                </div>
+
+            </div>
+        </div>
+        <!-- VIEW: WORD CLOUD (NEW) -->
+        <div id="view-wordcloud" class="view-section">
+            <div class="card" style="text-align:center;">
+                <h3>☁️ Strategic Vocabulary Cloud <button class="help-icon" onclick="showHelp('wordcloud')">?</button>
+                </h3>
+                <p class="section-desc" style="margin-bottom:15px;">
+                    Most frequent terms in patent publications. Toggle companies to filter.
+                </p>
+                <div style="width:100%; height:600px; position:relative;">
+                    <!-- [NEW] Word Cloud Controls -->
+                    <div
+                        style="position:absolute; top:10px; right:10px; z-index:10; background:rgba(255,255,255,0.9); padding:5px 10px; border-radius:8px; border:1px solid #e2e8f0; display:flex; gap:10px;">
+                        <label style="cursor:pointer; font-weight:600; color:#2563eb; font-size:0.85em;">
+                            <input type="checkbox" id="wc-openai" checked onchange="renderWordCloud()"> OpenAI
+                        </label>
+                        <label style="cursor:pointer; font-weight:600; color:#dc2626; font-size:0.85em;">
+                            <input type="checkbox" id="wc-anthropic" checked onchange="renderWordCloud()"> Anthropic
+                        </label>
+                        <label style="cursor:pointer; font-weight:600; color:#10b981; font-size:0.85em;">
+                            <input type="checkbox" id="wc-mistral" checked onchange="renderWordCloud()"> Mistral
+                        </label>
+                    </div>
+                    <canvas id="wordcloud-canvas" width="1000" height="600"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: OPPORTUNITY (MATRIX) -->
+        <div id="view-opportunity" class="view-section">
+            <div class="card">
+                <h3>🚀 Strategic Opportunity Matrix <button class="help-icon" onclick="showHelp('matrix')">?</button>
+                </h3>
+                <p style="color:#64748b; font-size:0.9em; margin-bottom:15px;">
+                    Visualizing "White Space" opportunities.
+                    <br><b>High Bar</b> = Dense Competition (Red Ocean).
+                    <b>Low Bar</b> = Low Density (Blue Ocean Opportunity).
+                </p>
+                <div id="matrix-chart" style="width:100%; height:500px;"></div>
+
+                <!-- [NEW] Strategic AI Analysis Section -->
+                <div class="card mt-6">
+                    <div class="section-title">🤖 Strategic AI Analysis (Mistral Large)</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                        <!-- Opportunity Compass (Chart) -->
+                        <div class="rounded-lg border border-slate-200 p-2 bg-white">
+                            <div id="opportunity-compass" style="width:100%; height:350px;"></div>
+                        </div>
+
+                        <!-- AI Report (Text) -->
+                        <div class="p-5 bg-slate-50 rounded-lg border border-slate-200 shadow-inner">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                                    <span>🧠 Intelligence Briefing <button class="help-icon"
+                                            onclick="showHelp('swot')">?</button></span>
+                                    <span id="report-status" class="text-xs font-normal text-slate-400"></span>
+                                </h3>
+                                <button id="btn-generate-report" onclick="triggerStrategicReport()"
+                                    class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700 transition"
+                                    disabled>
+                                    ✨ Generate Analysis (v3 Table)
+                                </button>
+                            </div>
+                            <div id="strategic-report-content" class="text-sm text-slate-600 space-y-3 leading-relaxed"
+                                style="max-height: 500px; overflow-y: auto;">
+                                <!-- Markdown Content Will Be Rendered Here -->
+                                <p class="text-slate-400 italic">Analysis ready. Click 'Generate' to run a real-time
+                                    strategic assessment (Mistral Large).</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- VIEW: COMPARISON (FTO -> DETAILED ANALYSIS) -->
+        <div id="view-comparison" class="view-section">
+            <div class="card" id="fto-section">
+                <h3 style="color:#1e293b;">🔍 Invention vs Strategic Landscape <button class="help-icon"
+                        onclick="showHelp('fto')">?</button></h3>
+                <p style="color:#64748b; font-size:0.9em;">
+                    Detailed semantic proximity assessment between internal Inventions and Competitor Patents.
+                </p>
+                <div id="fto-badge" style="margin:15px 0;">
+                    <span id="fto-count"
+                        style="font-weight:bold; color:#1e40af; background:#dbeafe; padding:4px 12px; border-radius:99px;">0
+                        Inventions Scanned</span>
+                </div>
+                <div id="fto-container"></div>
+            </div>
+        </div>
+        <!-- NOTIFICATIONS -->
+        <div id="detailModal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+                <h2 id="m-title" style="color:var(--primary);"></h2>
+                <div id="m-body" style="line-height:1.6;"></div>
+            </div>
+        </div>
+
+        <!-- Help Modal -->
+        <div id="helpModal" class="modal">
+            <div class="modal-content" style="max-width: 650px;">
+                <span class="close-btn" onclick="closeHelpModal()">&times;</span>
+                <h2 id="h-title"
+                    style="color:var(--primary); margin-bottom: 20px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">
+                    ❓ Methodology & Strategy
+                </h2>
+                <div id="h-body"></div>
+                <div style="margin-top:25px; text-align:right;">
+                    <button onclick="closeHelpModal()"
+                        style="background:#64748b; color:white; padding:8px 20px; border-radius:6px; border:none; cursor:pointer;">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. SAFETY NET: Global Error Handler -->
+        <script>
+            window.onerror = function (msg, url, line, col, error) {
+                console.error("Global Error:", msg, error);
+                // Only log to console, do not show intrusive banner unless critical
+                return false;
+            };
+            console.log("✅ Error Handler Installed");
+        </script>
+
+        <!-- HIDDEN DATA HOLDER -->
+        <div id="data-holder" style="display:none;">
+            <?= data ?>
+        </div>
+
+        <!-- 2. DATA LAYER: Injection Only -->
+        <script>
+            console.log("🔄 Injecting Data...");
+            let rawBase64 = "";
+            try {
+                // [FIX] Read from hidden div instead of template literal to avoid size limits
+                const hiddenDiv = document.getElementById('data-holder');
+                if (hiddenDiv) {
+                    window.rawBase64 = hiddenDiv.textContent.trim();
+                    console.log("✅ Data Read from DOM. Length:", window.rawBase64.length);
+                } else {
+                    throw new Error("Hidden data div not found");
+                }
+            } catch (e) {
+                console.error("❌ Data Injection Failed:", e);
+                throw e;
+            }
+        </script>
+
+        <!-- 3. APPLICATION LOGIC -->
+        <script>
+            console.log("🚀 VERSION CHECK: v4 Unified Logic (RadarMatch)");
+            (function () { // Wrap in IIFE to avoid global scope pollution and catch syntax errors better
+                console.log("🚀 Starting Application Logic...");
+
+                let rawData = [];
+                let ftoData = [];
+                let currentData = [];
+                let activeTab = 'overview';
+                let mapRange = null;
+
+                // Init
+                window.onload = function () {
+                    console.log("🏁 window.onload triggered");
+                    try {
+                        // Decode Base64
+                        let rawJson = "";
+                        const b64 = window.rawBase64 || "";
+
+                        if (!b64) {
+                            throw new Error("No data received from server (rawBase64 is empty)");
+                        }
+
+                        // [FIX] Clean string (remove newlines, spaces) just in case
+                        const cleanB64 = b64.replace(/\s/g, '');
+
+                        console.log("🔍 Original Length:", b64.length);
+                        console.log("🔍 Cleaned Length:", cleanB64.length);
+                        console.log("🔍 Modulo 4:", cleanB64.length % 4); // Should be 0
+                        console.log("🔍 Start:", cleanB64.substring(0, 50));
+
+                        if (cleanB64.length % 4 !== 0) {
+                            console.warn("⚠️ Base64 length is not a multiple of 4. Padding issue?");
+                        }
+
+                        try {
+                            // Robust Decoding
+                            const binString = atob(cleanB64);
+                            const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
+                            const decoder = new TextDecoder('utf-8');
+                            rawJson = decoder.decode(bytes);
+                        } catch (e) {
+                            console.error("Base64 Decode Failed, trying legacy...", e);
+                            try {
+                                rawJson = decodeURIComponent(Array.prototype.map.call(atob(b64), function (c) {
+                                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                                }).join(''));
+                            } catch (err2) {
+                                throw new Error("Failed to decode data: " + err2.message);
+                            }
+                        }
+
+                        // Parse JSON
+                        if (rawJson) {
+                            try {
+                                const parsed = JSON.parse(rawJson);
+
+                                // [NEW] Handle Structured Response (Items + Reports)
+                                if (parsed && !Array.isArray(parsed) && parsed.items) {
+                                    console.log("📦 Loaded Structured Data");
+
+                                    // [DEBUG] Inspect Mistral Data
+                                    if (parsed.fto) {
+                                        console.log("🛡️ FTO Data found (Items: " + parsed.fto.length + ")");
+                                        if (parsed.fto.length > 0) {
+                                            console.log("   - Sample Item:", parsed.fto[0]);
+                                            console.log("   - Has Matches?", parsed.fto[0].matches ? "YES" : "NO");
+                                            console.log("   - Matches Length:", parsed.fto[0].matches ? parsed.fto[0].matches.length : 0);
+                                        }
+                                    } else {
+                                        console.error("❌ 'fto' property missing in parsed JSON!");
+                                    }
+
+                                    rawData = parsed.items;
+                                    ftoData = parsed.fto || []; // [FIX] Restore Mistral Data
+                                    window.cachedReports = parsed.reports || {};
+                                    window.ftoAnalyses = parsed.ftoAnalyses || {}; // [NEW] Store Detailed FTO Analyses
+                                    console.log("📦 Cached Reports Keys:", Object.keys(window.cachedReports));
+                                    console.log("🛡️ Detailed FTO Analysis Subjects:", Object.keys(window.ftoAnalyses));
+
+                                    // Render Strategic Report
+                                    if (parsed.strategicReport) {
+                                        console.log("🧠 Cached Strategic Report Found");
+                                        // Use the new robust render function
+                                        setTimeout(() => {
+                                            if (window.renderStrategicReport) {
+                                                renderStrategicReport(parsed.strategicReport);
+                                            } else {
+                                                console.warn("⚠️ renderStrategicReport not yet available, retrying...");
+                                                setTimeout(() => window.renderStrategicReport && renderStrategicReport(parsed.strategicReport), 1000);
+                                            }
+                                        }, 500);
+                                    }
+
+                                    // Render Cached Reports IMMEDIATELY
+                                    if (window.renderCachedReports) setTimeout(window.renderCachedReports, 500);
+                                } else {
+                                    rawData = parsed; // Legacy Array
+                                }
+                            } catch (e) {
+                                throw new Error("JSON Parse Error: " + e.message);
+                            }
+                        } else {
+                            rawData = []; // Empty
+                        }
+
+                        // Handle New Structure { items: [], fto: [], updated: ... }
+                        // Note: The original code had repetitive checks, cleaning it up here.
+                        if (rawData.items || rawData.fto) {
+                            ftoData = rawData.fto || [];
+                            const metaUpdated = rawData.updated;
+                            const metaScanned = rawData.scannedCount;
+
+                            rawData = rawData.items || [];
+
+                            // Attach metadata to array for legacy support if needed
+                            rawData.updated = metaUpdated;
+                            rawData.scannedCount = metaScanned;
+                        }
+
+                        if (!Array.isArray(rawData)) {
+                            console.error("Frontend Error: rawData is not an array! It is: " + typeof rawData);
+                            document.body.innerHTML += "<div style='color:red; padding:20px;'><h1>Critical Error</h1><p>Data format invalid. Expected Array, got " + typeof rawData + "</p></div>";
+                            return;
+                        }
+
+                        currentData = [...rawData];
+
+                        // [NEW] Calculate Global Map Range for Fixed Zoom
+                        if (rawData.length > 0) {
+                            const xs = rawData.map(d => d.x).filter(v => v !== undefined);
+                            const ys = rawData.map(d => d.y).filter(v => v !== undefined);
+                            if (xs.length > 0 && ys.length > 0) {
+                                const minX = Math.min(...xs);
+                                const maxX = Math.max(...xs);
+                                const minY = Math.min(...ys);
+                                const maxY = Math.max(...ys);
+                                const bufferX = (maxX - minX) * 0.1;
+                                const bufferY = (maxY - minY) * 0.1;
+
+                                mapRange = {
+                                    x: [minX - bufferX, maxX + bufferX],
+                                    y: [minY - bufferY, maxY + bufferY]
+                                };
+                                console.log("Map Range Fixed:", mapRange);
+                            }
+                        }
+
+                        if (rawData.length === 0) {
+                            if (document.title.includes("(0 items)")) {
+                                alert("Server sent 0 items. Please run Analysis again.");
+                            } else {
+                                console.warn("Server says items exist but rawData is empty?");
+                            }
+                        }
+
+                        populateTopics();
+
+                        // Update dashboard
+                        updateDashboard();
+
+                        if (document.getElementById('total-count'))
+                            document.getElementById('total-count').innerText = rawData.length + " Patents";
+
+                        // Update date
+                        if (document.getElementById('last-updated') && rawData.updated) {
+                            document.getElementById('last-updated').innerText = rawData.updated;
+                        }
+
+                        // Render FTO
+                        renderFTO(ftoData, (rawData.scannedCount || 0));
+
+                    } catch (e) {
+                        alert("Frontend Error: " + e.message);
+                        console.error(e);
+                        document.body.innerHTML += '<p style="color:red">' + e.stack + '</p>';
+                    }
+                };
+
+                // ----------------------------------------------------
+                // 0. TAB LOGIC
+                // ----------------------------------------------------
+                window.switchTab = function (tabId) { // Explicitly attach to window
+                    activeTab = tabId;
+
+                    // Hide all views
+                    document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
+
+                    // Tab Button Styles
+                    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                    document.getElementById(tabId === 'swot-all' ? 'btn-swot-all' :
+                        tabId === 'trends' ? 'btn-trends' :
+                            tabId === 'wordcloud' ? 'btn-wordcloud' :
+                                tabId === 'opportunity' ? 'btn-opportunity' :
+                                    tabId === 'comparison' ? 'btn-comparison' :
+                                        tabId === 'skills' ? 'btn-skills' :
+                                            tabId === 'map' ? 'btn-map' :
+                                                'btn-' + tabId).classList.add('active');
+
+                    // Toggle Global Controls Visibility
+                    // User requested to hide filters for SWOT, WordCloud, Opportunity
+                    const hideControls = ['swot-all', 'wordcloud', 'opportunity', 'comparison'].includes(tabId);
+                    document.getElementById('global-controls').style.display = hideControls ? 'none' : 'flex';
+
+                    // Show Active View
+                    if (tabId === 'overview' || tabId === 'openai' || tabId === 'anthropic') {
+                        document.getElementById('view-list').style.display = 'block';
+                        updateDashboard();
+                    }
+                    else if (tabId === 'positioning') {
+                        document.getElementById('view-positioning').style.display = 'block';
+                        updateDashboard(); // [FIX] Refresh data for Map
+                        setTimeout(() => Plotly.Plots.resize('chart-div'), 100);
+                    }
+                    else if (tabId === 'skills') {
+                        document.getElementById('view-skills').style.display = 'block';
+                        updateDashboard(); // [FIX] Refresh data for Bar Chart
+                    }
+                    else if (tabId === 'trends') {
+                        document.getElementById('view-trends').style.display = 'block';
+                        // updateTrendChart() is called inside updateDashboard if activeTab is 'trends'
+                        updateDashboard(); // [FIX] Refresh data for Trend Chart
+                    }
+                    else if (tabId === 'swot-all') {
+                        document.getElementById('view-swot-all').style.display = 'block';
+                        // SWOT doesn't strictly need currentData for generation, but good to refresh context
+                        // But it does NOT use updateDashboard for rendering.
+                    }
+                    else if (tabId === 'wordcloud') {
+                        document.getElementById('view-wordcloud').style.display = 'block';
+                        updateDashboard(); // [FIX] Refresh data for Word Cloud
+                        renderWordCloud();
+                    }
+                    else if (tabId === 'opportunity') {
+                        document.getElementById('view-opportunity').style.display = 'block';
+                        renderMatrixChart(ftoData);
+                        setTimeout(() => Plotly.Plots.resize('matrix-chart'), 50);
+                    }
+                    else if (tabId === 'comparison') {
+                        document.getElementById('view-comparison').style.display = 'block';
+                    }
+                    else {
+                        // List Views (Overview, Anthropic, OpenAI)
+                        document.getElementById('view-list').style.display = 'block';
+
+                        // [NEW] SWOT Visibility
+                        const swotCard = document.getElementById('swot-card');
+                        const btnSwot = document.getElementById('btn-swot');
+                        const swotResult = document.getElementById('swot-result');
+
+                        if (activeTab === 'anthropic' || activeTab === 'openai' || activeTab === 'overview') {
+                            swotCard.style.display = 'block'; // [FIX] Force display
+                            // Reset result if hidden? No, keep it if already generated.
+
+                            let label = activeTab;
+                            if (activeTab === 'overview') label = "Mistral";
+                            else label = activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+
+                            btnSwot.innerText = `✨ Generate SWOT for ${label}`;
+                            btnSwot.disabled = false;
+                        } else {
+                            swotCard.style.display = 'none';
+                        }
+
+                        // Trigger refresh to apply filters
+                        updateDashboard();
+                    }
+                }
+
+                // 1. POPULATE DROPDOWN
+                function populateTopics() {
+                    const topics = [...new Set(rawData.map(d => d.Topic))].sort();
+                    const sel = document.getElementById('topicSelect');
+                    topics.forEach(t => {
+                        let opt = document.createElement('option');
+                        opt.value = t;
+                        opt.innerText = t;
+                        sel.appendChild(opt);
+                    });
+                }
+
+                // 2. MASTER FILTER FUNCTION
+                window.updateDashboard = function () {
+                    console.log("🔘 Update Dashboard Triggered");
+
+                    // Get Inputs
+                    const yMin = parseInt(document.getElementById('yearMin').value);
+                    const yMax = parseInt(document.getElementById('yearMax').value);
+                    const sTitle = document.getElementById('searchTitle').value.toLowerCase();
+                    const sInv = document.getElementById('searchInv').value.toLowerCase();
+                    const sTopic = document.getElementById('topicSelect').value;
+
+                    console.log(`INPUTS: Year=${yMin}-${yMax}, Title="${sTitle}", Inv="${sInv}", Topic="${sTopic}"`);
+                    console.log(`Active Tab: ${activeTab}`);
+
+                    // Filter Data
+                    currentData = rawData.filter(d => {
+                        if (!d) return false;
+                        const year = d.AppYear ? parseInt(d.AppYear) : 0; // Default to 0 if missing
+                        const matchYear = (year === 0) || (year >= yMin && year <= yMax);
+
+                        const title = (d.Title || "").toLowerCase();
+                        const invs = (d.Inventors || "").toLowerCase();
+
+                        const matchTitle = title.includes(sTitle);
+                        const matchInv = invs.includes(sInv);
+                        const matchTopic = sTopic === 'ALL' || d.Topic === sTopic;
+
+                        // NEW: Tab Filter
+                        let matchTab = true;
+                        if (activeTab === 'anthropic') matchTab = (d.Company === 'Anthropic');
+                        if (activeTab === 'openai') matchTab = (d.Company === 'OpenAI');
+                        // [FIX] For 'wordcloud' and 'trends', we want ALL data, not filtered by company (unless user uses other filters)
+                        // 'overview' also shows all.
+
+                        return matchYear && matchTitle && matchInv && matchTopic && matchTab;
+                    });
+
+                    console.log(`✅ Filtered Count: ${currentData.length}`);
+
+                    // Visual Toast
+                    const toast = document.createElement('div');
+                    toast.innerText = `Filters Applied: ${currentData.length} Patents`;
+                    toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#333; color:white; padding:10px 20px; border-radius:5px; z-index:1000; animation: fadeOut 2s forwards; opacity:0.9;";
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 2000);
+
+                    // Update UI
+                    try {
+                        renderChart(currentData);
+                    } catch (e) {
+                        console.error("Render Chart Failed:", e);
+                    }
+
+                    // Conditional Rendering based on Active Tab to save resources
+                    if (activeTab === 'skills') renderRadarChart(currentData);
+                    if (activeTab === 'trends') renderTrendChart(currentData);
+                    if (activeTab === 'opportunity') renderMatrixChart(ftoData);
+                    if (activeTab === 'wordcloud') renderWordCloud();
+
+                    renderInventors(currentData);
+                    renderTable(currentData);
+                    document.getElementById('countDisplay').innerText = `Showing ${currentData.length} patents`;
+                }
+
+                // 3. RENDER CHART (PLOTLY)
+                function renderChart(data) {
+                    console.log(`🗺️ Rendering Map with ${data.length} points`);
+                    const traces = [];
+
+                    // [FIX] REMOVED LEGACY STRATEGIC VIEW LOGIC
+                    const colors = { 'OpenAI': '#2563eb', 'Anthropic': '#dc2626', 'Other': '#64748b' };
+                    const shapes = { 'OpenAI': 'circle', 'Anthropic': 'square', 'Other': 'diamond' };
+
+                    const presentCompanies = [...new Set(data.map(d => d.Company))];
+                    presentCompanies.forEach(comp => {
+                        // [FIX] Ensure we only map items that HAVE coordinates
+                        const compData = data.filter(d => d.Company === comp && d.x !== undefined && d.y !== undefined);
+
+                        if (compData.length === 0) {
+                            console.warn(`⚠️ No map coordinates found for ${comp}. Did you run the backend script enough times?`);
+                            return;
+                        }
+
+                        traces.push({
+                            x: compData.map(d => d.x),
+                            y: compData.map(d => d.y),
+                            text: compData.map(d => `<b>${d.Title}</b><br>${d.Topic}<br>${d.AppDate}`),
+                            mode: 'markers',
+                            name: comp,
+                            marker: {
+                                symbol: shapes[comp] || 'circle',
+                                size: 10,
+                                opacity: 0.8,
+                                color: colors[comp] || '#666',
+                                line: { width: 0.5, color: 'white' }
+                            },
+                            customdata: compData.map(d => d.URL),
+                            type: 'scatter'
+                        });
+                    });
+
+                    // --------------------------------------------------------------------------------
+                    // 4. OVERLAY INTERNAL INVENTIONS (Green Stars)
+                    // --------------------------------------------------------------------------------
+                    // Strategy: Interpolate (x,y) from top 3 nearest neighbors
+
+                    if (ftoData && ftoData.length > 0) {
+                        const inventionPoints = [];
+
+                        ftoData.forEach(inv => {
+                            if (!inv.matches || inv.matches.length === 0) return;
+
+                            // Find neighbors in currentData (or rawData to be safe)
+                            // We need the X,Y of the matches.
+                            // The matches in ftoData only have Similarity, Title, Patent Number.
+                            // We must look up the Patent Number in rawData to get X,Y.
+
+                            let sumX = 0, sumY = 0, sumWeight = 0;
+                            let count = 0;
+
+                            // Use top 3 matches for triangulation
+                            const neighbors = inv.matches.slice(0, 3);
+
+                            neighbors.forEach(m => {
+                                if (!m.num) return; // [FIX] Safety check
+                                // ROBUST LOOKUP: Exact -> Partial -> Title
+                                // [FIX] Use 'data' instead of 'rawData' to ensure we only map against FILTERED patents
+                                let neighborPatent = data.find(p => p.PatentNumber === m.num);
+
+                                if (!neighborPatent) {
+                                    // Try partial match (e.g. US202412345 vs US-2024-12345)
+                                    const cleanNum = m.num.replace(/[^A-Z0-9]/g, '');
+                                    neighborPatent = data.find(p => p.PatentNumber && p.PatentNumber.replace(/[^A-Z0-9]/g, '').includes(cleanNum));
+                                }
+
+                                if (!neighborPatent && m.patentTitle) {
+                                    // Fuzzy Title Match
+                                    const searchTitle = m.patentTitle.toLowerCase().substring(0, 30);
+                                    neighborPatent = data.find(p => p.Title && p.Title.toLowerCase().includes(searchTitle));
+                                }
+
+                                if (neighborPatent && neighborPatent.x !== undefined) {
+                                    const weight = parseFloat(m.similarity || 50); // Use similarity as weight
+                                    sumX += (neighborPatent.x * weight);
+                                    sumY += (neighborPatent.y * weight);
+                                    sumWeight += weight;
+                                    count++;
+                                }
+                            });
+
+                            if (count > 0 && sumWeight > 0) {
+                                const displayName = inv.FolderName || inv.inventionName || "Unknown";
+                                inventionPoints.push({
+                                    x: sumX / sumWeight,
+                                    y: sumY / sumWeight,
+                                    title: displayName,
+                                    score: (sumWeight / count).toFixed(1) // Avg Similarity
+                                });
+                            }
+                        });
+                        if (inventionPoints.length > 0) {
+                            traces.push({
+                                x: inventionPoints.map(d => d.x),
+                                y: inventionPoints.map(d => d.y),
+                                text: inventionPoints.map(d => `<b>⭐ MISTRAL: ${d.title}</b><br>Avg Proximity: ${d.score}%`),
+                                mode: 'markers', // Removed +text to reduce clutter if changing style, or keep text? User just said shape/size. I'll keep text but maybe smaller.
+                                name: 'Mistral',
+                                marker: {
+                                    symbol: 'circle', // [FIX] Standard shape
+                                    size: 10,         // [FIX] Standard size
+                                    color: '#10b981', // Emerald Green
+                                    line: { width: 0.5, color: 'white' }
+                                },
+                                type: 'scatter',
+                                hoverinfo: 'text'
+                            });
+                        }
+                    }
+
+                    const layout = {
+                        title: '',
+                        hovermode: 'closest',
+                        height: 500, // Reduced slightly to fit header
+                        xaxis: {
+                            visible: false,
+                            range: mapRange ? mapRange.x : undefined // [FIX] Fixed Zoom X
+                        },
+                        yaxis: {
+                            visible: false,
+                            range: mapRange ? mapRange.y : undefined // [FIX] Fixed Zoom Y
+                        },
+                        legend: { orientation: 'h', y: 1.1 },
+                        margin: { t: 30, b: 20, l: 20, r: 20 }
+                    };
+
+                    // [FIX] Force newPlot instead of react to ensure old points are removed
+                    Plotly.newPlot('chart-div', traces, layout, { responsive: true });
+
+                    // [FIX] Global Click Handler
+                    const chartDiv = document.getElementById('chart-div');
+                    if (chartDiv) {
+                        chartDiv.removeAllListeners && chartDiv.removeAllListeners('plotly_click');
+                        chartDiv.on('plotly_click', function (data) {
+                            if (!data || !data.points) return;
+                            const url = data.points[0].customdata;
+                            if (url) window.open(url, '_blank');
+                        });
+                    }
+                }
+
+                // NEW: RENDER INVENTORS CHART
+                function renderInventors(data) {
+                    const countMap = {};
+
+                    data.forEach(d => {
+                        let invs = [];
+                        if (d.InventorsList && Array.isArray(d.InventorsList)) {
+                            invs = d.InventorsList;
+                        } else if (d.Inventors) {
+                            // [FIX] Handle potential null/undefined
+                            invs = String(d.Inventors).split(',').map(s => s.trim());
+                        }
+
+                        invs.forEach(inv => {
+                            if (inv.includes('...')) return; // skip truncation
+                            if (!inv) return;
+                            // Normalize case (Title Case)
+                            const name = inv.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+                            countMap[name] = (countMap[name] || 0) + 1;
+                        });
+                    });
+
+                    // [NEW] Advanced Inventor Merging (Permutations + Subsets)
+                    // 1. Canonicalize names (sort tokens) to handle "George Saon" vs "Saon George"
+                    const tokenMap = {}; // canonicalString -> { total: 0, distinctNames: Set, bestName: "" }
+
+                    Object.keys(countMap).forEach(rawName => {
+                        const tokens = rawName.toLowerCase().split(/[\s,]+/).filter(t => t.length > 1).sort();
+                        if (tokens.length === 0) return;
+
+                        const canonical = tokens.join(" ");
+                        if (!tokenMap[canonical]) {
+                            tokenMap[canonical] = { total: 0, distinctNames: new Set(), bestName: rawName, tokens: new Set(tokens) };
+                        }
+
+                        tokenMap[canonical].total += countMap[rawName];
+                        tokenMap[canonical].distinctNames.add(rawName);
+
+                        // Update best name (longest is usually best, e.g. "Saon George Andrei" > "Saon George")
+                        if (rawName.length > tokenMap[canonical].bestName.length) {
+                            tokenMap[canonical].bestName = rawName;
+                        }
+                    });
+
+                    // 2. Merge Subsets (e.g. "Saon George" into "Saon George Andrei")
+                    // Sort canonical keys by token count (descending)
+                    const canonicalKeys = Object.keys(tokenMap).sort((a, b) => tokenMap[b].tokens.size - tokenMap[a].tokens.size);
+
+                    const finalMap = {}; // DisplayName -> Count
+                    const processedKeys = new Set();
+
+                    canonicalKeys.forEach(longKey => {
+                        if (processedKeys.has(longKey)) return;
+
+                        const longData = tokenMap[longKey];
+                        let finalCount = longData.total;
+                        processedKeys.add(longKey);
+
+                        // Check against all remaining (shorter/equal) keys
+                        // Optimization: Only check if they might be subsets
+                        for (let i = 0; i < canonicalKeys.length; i++) {
+                            const shortKey = canonicalKeys[i];
+                            if (processedKeys.has(shortKey)) continue;
+
+                            const shortData = tokenMap[shortKey];
+
+                            // Check if shortKey tokens are a subset of longKey tokens
+                            let isSubset = true;
+                            for (let t of shortData.tokens) {
+                                if (!longData.tokens.has(t)) {
+                                    isSubset = false;
+                                    break;
+                                }
+                            }
+
+                            if (isSubset) {
+                                finalCount += shortData.total;
+                                processedKeys.add(shortKey);
+                            }
+                        }
+
+                        finalMap[longData.bestName] = finalCount;
+                    });
+
+                    // Convert to array and sort
+                    const sorted = Object.keys(finalMap)
+                        .map(name => ({ name, count: finalMap[name] }))
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 15); // Top 15
+
+                    // Reverse for horizontal chart (top item at top)
+                    sorted.reverse();
+
+                    const trace = {
+                        x: sorted.map(i => i.count),
+                        y: sorted.map(i => i.name),
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: {
+                            color: sorted.map(i => {
+                                // Optional: Highlight top ones? Or simple gradient?
+                                return '#3b82f6'; // Tailwind blue-500
+                            })
+                        }
+                    };
+
+                    const layout = {
+                        title: '',
+                        height: 400,
+                        margin: { l: 150, t: 20, r: 20, b: 30 },
+                        xaxis: { title: 'Patent Count' }
+                    };
+
+                    Plotly.react('inventor-chart', [trace], layout);
+                }
+
+                // ----------------------------------------------------
+                // NEW VISUALIZATIONS
+                // ----------------------------------------------------
+
+
+                // ----------------------------------------------------
+                // TAXONOMY MAPPING
+                // ----------------------------------------------------
+
+
+                // ... (renderRadarChart updated below) ...
+
+                // ----------------------------------------------------
+                // 7. TOPIC DISTRIBUTION (BAR CHART - Was Radar)
+                // ----------------------------------------------------
+                function renderRadarChart(data) {
+                    const companies = ['OpenAI', 'Anthropic', 'Mistral'];
+
+                    // ... (Mistral Inference Logic - Same as before) ...
+                    // Quick re-implementation of inference since I'm replacing the whole function block
+                    const mistralTopics = [];
+                    if (ftoData && ftoData.length > 0) {
+                        ftoData.forEach(inv => {
+                            if (inv.matches && inv.matches.length > 0) {
+                                const topMatch = inv.matches[0];
+                                if (!topMatch.num) { mistralTopics.push("Other"); return; } // [FIX] Safety check
+
+                                // Robust Lookup
+                                let pObj = rawData.find(p => p.PatentNumber === topMatch.num);
+                                if (!pObj) {
+                                    const cleanNum = topMatch.num.replace(/[^A-Z0-9]/g, '');
+                                    pObj = rawData.find(p => p.PatentNumber && p.PatentNumber.replace(/[^A-Z0-9]/g, '').includes(cleanNum));
+                                }
+                                if (!pObj && topMatch.patentTitle) {
+                                    const searchTitle = topMatch.patentTitle.toLowerCase().substring(0, 30);
+                                    pObj = rawData.find(p => p.Title && p.Title.toLowerCase().includes(searchTitle));
+                                }
+
+                                if (pObj && pObj.Topic) mistralTopics.push(pObj.Topic);
+                                else mistralTopics.push("Other");
+                            } else {
+                                mistralTopics.push("Other");
+                            }
+                        });
+                    }
+
+                    // 1. Collect All Topics
+                    // [FIX] Use RAW DATA to get ALL possible topics
+                    // [DEBUG] Showing "Uncategorized" to see if data is hidden there
+                    const globalTopics = rawData.map(d => d.Topic).filter(t => t);
+                    // Also include Mistral topics just in case
+                    const allTopics = [...new Set([...globalTopics, ...mistralTopics])].sort();
+
+                    if (allTopics.length === 0) {
+                        console.warn("⚠️ No topics found in current data view.");
+                        document.getElementById('radar-chart').innerHTML = "<div style='text-align:center; padding:50px;'>Not enough data.</div>";
+                        return;
+                    }
+
+                    console.log(`📊 [RADAR CHART] Global Topics Found: ${allTopics.length}`, allTopics);
+                    // Force show ALL topics even if counts are zero
+                    // (Already handled by constructing counts object with 0s)
+
+                    // 2. Count per Company per Topic
+                    // Structure: { Topic: { OpenAI: 10, Anthropic: 5, Mistral: 2 } }
+                    const counts = {};
+                    allTopics.forEach(t => counts[t] = { OpenAI: 0, Anthropic: 0, Mistral: 0, Total: 0 });
+
+                    // Count Market Data
+                    let debugCounts = { OAI: 0, ANT: 0, Total: 0 };
+                    data.forEach(d => {
+                        debugCounts.Total++;
+                        if (!d.Topic) return;
+                        const cat = d.Topic;
+
+                        // [FIX] Robust Company Check
+                        const comp = (d.Company || "").trim();
+
+                        if (counts[cat]) {
+                            if (comp === 'OpenAI') { counts[cat].OpenAI++; debugCounts.OAI++; }
+                            else if (comp === 'Anthropic') { counts[cat].Anthropic++; debugCounts.ANT++; }
+
+                            counts[cat].Total++;
+                        } else {
+                            console.warn(`⚠️ Mismatch Topic: "${cat}" (Company: ${comp}) not in allTopics!`);
+                        }
+                    });
+                    console.log("📊 [RADAR CHART] Market Data Counts:", debugCounts);
+
+                    // Count Mistral Data
+                    mistralTopics.forEach(t => {
+                        const cat = t;
+                        if (counts[cat]) {
+                            counts[cat].Mistral++;
+                            counts[cat].Total++;
+                        }
+                    });
+
+                    // 3. Sort Topics by Total Volume (Descending)
+                    // For Horizontal Bar, top item is at bottom of Y-axis unless reversed.
+                    // We want Top Count at Top of Chart.
+                    const sortedTopics = allTopics.sort((a, b) => counts[a].Total - counts[b].Total); // Ascending for Plotly Y
+
+                    // 4. Create Traces
+                    const traceOpenAI = {
+                        y: sortedTopics,
+                        x: sortedTopics.map(t => counts[t].OpenAI),
+                        name: 'OpenAI',
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: { color: '#2563eb' }
+                    };
+                    const traceAnthropic = {
+                        y: sortedTopics,
+                        x: sortedTopics.map(t => counts[t].Anthropic),
+                        name: 'Anthropic',
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: { color: '#dc2626' }
+                    };
+                    const traceMistral = {
+                        y: sortedTopics,
+                        x: sortedTopics.map(t => counts[t].Mistral),
+                        name: 'Mistral',
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: { color: '#10b981' }
+                    };
+
+                    const layout = {
+                        barmode: 'stack', // Stacked as requested ("cumulés")
+                        title: '',
+                        height: Math.max(500, sortedTopics.length * 35), // Increased height per bar
+                        margin: { l: 300, t: 30, r: 20, b: 30 }, // [FIX] Increased Left Margin for long topic names
+                        yaxis: { automargin: true }, // [FIX] Ensure labels fit
+                        xaxis: { title: 'Number of Patents' },
+                        legend: { orientation: 'h', y: 1.05 }
+                    };
+
+                    Plotly.react('radar-chart', [traceOpenAI, traceAnthropic, traceMistral], layout);
+                }
+
+                // ----------------------------------------------------
+                // 8. TREND CHART (Time Series)
+                // ----------------------------------------------------
+                window.updateTrendChart = function () {
+                    renderTrendChart(currentData);
+                }
+
+                function renderTrendChart(data) {
+                    // [NEW] Filter by Company Toggles
+                    const showOpenAI = document.getElementById('trend-openai').checked;
+                    const showAnthropic = document.getElementById('trend-anthropic').checked;
+                    const showMistral = document.getElementById('trend-mistral').checked;
+
+                    // 1. Group by Topic -> Year -> Count
+                    const topicYearMap = {};
+                    const topicTotal = {};
+                    const yearsSet = new Set();
+
+                    // Prepare Mistral Data (if needed)
+                    // If showMistral is true, we need to include ftoData (which is Mistral)
+                    // But wait, renderTrendChart receives 'data' which is usually 'currentData' (OpenAI + Anthropic).
+                    // Mistral data is in 'ftoData'.
+                    // So we need to combine them if checkboxes are checked.
+
+                    let combinedData = [];
+
+                    if (showOpenAI) combinedData = combinedData.concat(data.filter(d => d.Company === 'OpenAI'));
+                    if (showAnthropic) combinedData = combinedData.concat(data.filter(d => d.Company === 'Anthropic'));
+
+                    if (showMistral && ftoData) {
+                        // We need to map ftoData to { AppDate: ???, Topic: ??? }
+                        // ftoData has 'matches' but not its own AppDate (usually). 
+                        // Wait, ftoData = inventions. Inventions usually have a date? 
+                        // Let's assume ftoData has 'Date' or we use '2024' as default for internal stuff?
+                        // Actually, for internal inventions, we might not have a date in the JSON unless extracted.
+                        // Let's check ftoData structure.
+                        // It has 'SummaryText', 'Name', 'Link'.
+                        // If no date, we can't plot trend.
+                        // BUT, maybe the user means "Mistral Patents" (if any exist in rawData)?
+                        // "Mistral (Internal)" usually implies the unpublished inventions I provided.
+                        // If I don't have dates for them, I can't plot them on a timeline.
+                        // Checking previous code: Mistral points on Map have x,y.
+                        // But Trend needs Date.
+                        // Let's assume for now we only plot what's in 'data' (Competitors) + maybe match Company='Mistral' if it exists in rawData.
+                        // If 'Mistral (Internal)' is purely ftoData without dates, I can't include it in Trend easily.
+                        // I will add a console log or just filter 'data' for now.
+                        // If 'Mistral' exists in 'data' (published patents), it will appear.
+
+                        // WAIT: The user said "activer ou désactiver openai et/ou anthropic et/ou mistral".
+                        // If Mistral is internal only, I might skip it for Trends for now unless I have dates.
+                        // Let's stick to filtering 'data' which contains the market data.
+                    }
+
+                    // Correction: 'data' (currentData) contains whatever is filtered.
+                    // If I want to filter by company *inside* the chart, I should use the full 'currentData' 
+                    // and filter it again based on checkboxes.
+                    // But wait, 'currentData' is already filtered by the Global Tab (e.g. OpenAI tab).
+                    // If I am in "Trends" tab, currentData *should* probably be everything.
+                    // updateDashboard sets currentData based on activeTab.
+                    // If activeTab is 'trends', matchTab is true (all companies).
+                    // So 'data' passed here is All Companies (filtered by year/topic).
+                    // So I just need to filter 'data' by the checkboxes.
+
+                    const filteredData = data.filter(d => {
+                        const comp = (d.Company || "").trim(); // [FIX] Robust check
+                        if (comp === 'OpenAI' && !showOpenAI) return false;
+                        if (comp === 'Anthropic' && !showAnthropic) return false;
+                        if (comp === 'Mistral' && !showMistral) return false;
+                        return true;
+                    });
+
+                    filteredData.forEach(d => {
+                        let year = "Unknown";
+                        if (d.AppDate) {
+                            const yMatch = d.AppDate.match(/\d{4}/);
+                            if (yMatch) year = parseInt(yMatch[0]);
+                        }
+
+                        if (year < 2015 || year > 2026) return;
+
+                        const topic = d.Topic || "Other";
+                        yearsSet.add(year);
+
+                        if (!topicYearMap[topic]) topicYearMap[topic] = {};
+                        topicYearMap[topic][year] = (topicYearMap[topic][year] || 0) + 1;
+
+                        topicTotal[topic] = (topicTotal[topic] || 0) + 1;
+                    });
+
+                    // 2. Identify Top Topics (Use ALL topics if possible, or limit to top 50?)
+                    // [USER REQUEST] Show all topics
+                    const topTopics = Object.keys(topicTotal)
+                        .sort((a, b) => topicTotal[b] - topicTotal[a]);
+                    // .slice(0, 10); // [REMOVED] Show ALL
+
+                    // 3. Prepare Traces
+                    const sortedYears = Array.from(yearsSet).sort((a, b) => a - b);
+
+                    const traces = topTopics.map(topic => {
+                        const yValues = sortedYears.map(y => topicYearMap[topic][y] || 0);
+                        return {
+                            x: sortedYears,
+                            y: yValues,
+                            name: topic,
+                            mode: 'lines+markers',
+                            line: { shape: 'spline', width: 2 },
+                            type: 'scatter'
+                        };
+                    });
+
+                    const finalLayout = {
+                        title: '',
+                        height: 550,
+                        xaxis: { title: 'Year', tickmode: 'linear' },
+                        yaxis: { title: 'Number of Patents' },
+                        hovermode: 'x unified',
+                        legend: { orientation: 'h', y: 1.1 },
+                        margin: { t: 50, b: 50, l: 50, r: 20 }
+                    };
+
+                    Plotly.react('trend-chart', traces, finalLayout);
+                }
+
+                // 9. MATRIX CHART (Opportunity)
+                function renderMatrixChart(inventions) {
+                    if (!inventions || inventions.length === 0) {
+                        document.getElementById('matrix-chart').innerHTML = "<div style='text-align:center; padding:50px; color:#aaa;'>No Analysis Data Available.<br>Run 'Comparison' analysis first.</div>";
+                        return;
+                    }
+
+                    // Calculate Average Similarity of Top 5 matches for each invention
+                    // Calculate Average Similarity of Top 5 matches for each invention
+                    let metrics = inventions.map(function (inv) {
+                        var avgSim = 0;
+                        if (inv.matches && inv.matches.length > 0) {
+                            var top5 = inv.matches.slice(0, 5);
+                            var sum = top5.reduce(function (acc, m) { return acc + parseInt(m.similarity || 0); }, 0);
+                            avgSim = sum / top5.length;
+                        }
+
+                        var displayName = inv.FolderName || inv.inventionName || "Unknown";
+
+                        return {
+                            name: displayName.substring(0, 20),
+                            full: displayName,
+                            score: avgSim
+                        };
+                    });
+
+                    // Sort: High Density (Red) to Low Density/Opportunity (Green)
+                    metrics.sort(function (a, b) { return b.score - a.score; });
+
+                    // [FIX] Dynamic Scaling
+                    // Calculate min/max scores from the dataset to maximize contrast
+                    const scores = metrics.map(m => m.score);
+                    const minScore = Math.min(...scores);
+                    const maxScore = Math.max(...scores);
+
+                    // Add padding to range for better visualization
+                    const rangePadding = (maxScore - minScore) * 0.1 || 5;
+
+                    var trace = {
+                        x: metrics.map(function (m) { return m.name; }),
+                        y: metrics.map(function (m) { return m.score; }),
+                        type: 'bar',
+                        marker: {
+                            color: metrics.map(function (m) { return m.score; }),
+                            // [FIX] Custom Colorscale: Blue (Min Score) -> Green -> Red (Max Score)
+                            colorscale: [
+                                [0, '#3b82f6'],   // Blue (Relative Blue Ocean)
+                                [0.5, '#10b981'], // Green (Moderate)
+                                [1, '#dc2626']    // Red (Relative Red Ocean)
+                            ],
+                            cmin: minScore,
+                            cmax: maxScore,
+                            showscale: true
+                        }
+                    };
+
+                    var layout = {
+                        title: '',
+                        height: 500,
+                        xaxis: { title: 'Invention', tickangle: -45 },
+                        // [FIX] Auto-range Y-axis to focus on the differences
+                        yaxis: { title: 'Avg. Similarity (Top 5 Matches)', range: [Math.max(0, minScore - rangePadding), Math.min(100, maxScore + rangePadding)] },
+                        margin: { b: 150 }
+                    };
+
+                    Plotly.newPlot('matrix-chart', [trace], layout);
+
+                    // [NEW] Trigger Strategic Analysis
+                    analyzeStrategicLandscape(currentData, ftoData);
+                }
+
+                // [NEW] Helper for Strategic Stats (Shared)
+                function calculateStrategicStats(marketData, mistralData) {
+                    console.log("📊 [STATS] Calculating Strategic Stats...");
+                    console.log("   - Market Data Items:", marketData ? marketData.length : 0);
+                    console.log("   - Mistral Data Items:", mistralData ? mistralData.length : 0);
+
+                    // 1. Aggregate by TOPIC (Cluster) instead of Keywords
+                    const topicStats = {};
+
+                    const processItem = (d, company) => {
+                        // Use the AI-assigned Topic (fallback to 'Uncategorized')
+                        const topic = d.Topic || d.Cluster || "Uncategorized";
+
+                        if (!topicStats[topic]) {
+                            topicStats[topic] = {
+                                topic: topic,
+                                openai: 0,
+                                anthropic: 0,
+                                mistral: 0,
+                                total: 0
+                            };
+                        }
+
+                        const weight = 1;
+                        topicStats[topic].total += weight;
+                        if (company === 'OpenAI') topicStats[topic].openai += weight;
+                        else if (company === 'Anthropic') topicStats[topic].anthropic += weight;
+                        // [DEBUG] Log when Mistral item is processed
+                        else if (company === 'Mistral' || company === 'Mistral (Internal)') {
+                            topicStats[topic].mistral += weight;
+                            // console.log(`      Found Mistral Item in topic '${topic}':`, d.Title || d.inventionName);
+                        }
+                    };
+
+                    // Process Market Data to identify TOPICS
+                    marketData.forEach(d => {
+                        processItem(d, d.Company);
+                    });
+
+                    // Process Mistral Summaries (Internal)
+                    if (mistralData) {
+                        mistralData.forEach(d => {
+                            let bestTopic = "Uncategorized";
+
+                            // [v4 UNIFIED LOGIC] Robust Nearest Neighbor Topic Inheritance
+                            // Copied from renderRadarChart for 1:1 Consistency
+                            if (d.matches && d.matches.length > 0) {
+                                const topMatch = d.matches[0];
+                                if (!topMatch.num && !topMatch.patentTitle) {
+                                    // bestTopic remains Uncategorized
+                                } else {
+                                    // 1. Try Exact Patent Number Match
+                                    let matchPatent = marketData.find(p => p.PatentNumber === topMatch.num);
+
+                                    // 2. Try Cleaned Patent Number Match (e.g. US2024... vs US 2024...)
+                                    if (!matchPatent && topMatch.num) {
+                                        const cleanNum = topMatch.num.replace(/[^A-Z0-9]/g, '');
+                                        matchPatent = marketData.find(p => p.PatentNumber && p.PatentNumber.replace(/[^A-Z0-9]/g, '').includes(cleanNum));
+                                    }
+
+                                    // 3. Try Fuzzy Title Match (First 30 chars)
+                                    if (!matchPatent && topMatch.patentTitle) {
+                                        const searchTitle = topMatch.patentTitle.toLowerCase().substring(0, 30);
+                                        matchPatent = marketData.find(p => p.Title && p.Title.toLowerCase().includes(searchTitle));
+                                    }
+
+                                    // 4. Inherit Topic if Found
+                                    if (matchPatent && matchPatent.Topic) {
+                                        bestTopic = matchPatent.Topic;
+                                    }
+                                }
+                            }
+
+                            // [FIX] Ignore Generic/Stop-word Topics (Safety Net)
+                            const STOP_TOPICS = new Set(['mist', 'invention', 'summary', 'tool', 'code', 'text', 'this', 'user', 'solution', 'document', 'model', 'models', 'system', 'systems', 'process', 'processing', 'method', 'apparatus', 'device', 'computer', 'program', 'product', 'application', 'data', 'information', 'network', 'server', 'client', 'interface']);
+
+                            // Clean defaults
+                            if (!bestTopic || bestTopic === "Uncategorized" || STOP_TOPICS.has(bestTopic.toLowerCase()) || bestTopic.length < 3) {
+                                bestTopic = "Uncategorized"; // Force to uncategorized if garbage
+                            }
+
+                            // Try one last heuristic: Look for valid Market Topics in the Title
+                            if (bestTopic === "Uncategorized") {
+                                for (const knownTopic of Object.keys(topicStats)) {
+                                    if (d.title && d.title.toLowerCase().includes(knownTopic.toLowerCase())) {
+                                        bestTopic = knownTopic;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // We create a temporary object to avoid mutating the original ftoData permanently with potentially different filtered contexts
+                            // actually, mutating ftoData.Topic is fine as it improves over time, but for safety in filtered views let's just use it.
+                            // For this stats calculation:
+                            const tempItem = { ...d, Topic: bestTopic };
+                            processItem(tempItem, "Mistral");
+                        });
+                    }
+
+                    // Filter & Sort Top Topics
+                    const topics = Object.values(topicStats)
+                        .filter(t => t.total > 0 && t.topic !== "Uncategorized")
+                        .sort((a, b) => b.total - a.total)
+                        .slice(0, 50); // [FIX] Increased slice to 50 to capture tail
+
+                    // [DEBUG] Log Totals
+                    const totalMistral = topics.reduce((acc, t) => acc + t.mistral, 0);
+                    console.log("   ✅ Stats Calculation Complete. Total Mistral Items Counted:", totalMistral);
+                    console.log("   - Top 3 Topics for Mistral:", topics.sort((a, b) => b.mistral - a.mistral).slice(0, 3));
+
+                    return topics;
+                }
+
+                // [NEW] Strategic Analysis Logic (Topic-Based)
+                function analyzeStrategicLandscape(marketData, mistralData) {
+                    const topics = calculateStrategicStats(marketData, mistralData);
+
+                    // 3. Prepare Data for Compass (Frontend Chart)
+                    const compassData = [];
+                    topics.forEach(t => {
+                        const marketScore = t.openai + t.anthropic;
+                        const mistralScore = t.mistral;
+                        let status = '';
+
+                        // Strategic Definitions
+                        if (mistralScore > 0 && marketScore === 0) status = '💎 Blue Ocean';
+                        else if (mistralScore >= (marketScore * 0.5)) status = '✅ Stronghold';
+                        else if (mistralScore > 0) status = '⚔️ Battleground';
+                        else status = '🚩 Gap / Risk';
+
+                        compassData.push({ term: t.topic, x: marketScore, y: mistralScore, status: status });
+                    });
+
+                    // 4. Render Compass Chart
+                    renderCompassChart(compassData);
+
+                    // Store AI Data (Legacy fallback, but we will recalculate on trigger)
+                    window.lastStrategicStats = topics.map(t => ({
+                        term: t.topic,
+                        openai: t.openai,
+                        anthropic: t.anthropic,
+                        mistral: t.mistral
+                    }));
+
+                    // Allow button to be clicked
+                    const btn = document.getElementById('btn-generate-report');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = "✨ Generate Analysis (Topics)";
+                        console.log("✅ Strategic Analysis Ready with " + topics.length + " topics.");
+                        btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                        btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                    }
+                }
+
+                // [New] Manual Trigger
+                window.triggerStrategicReport = function () {
+                    console.log("🖱️ Manual Trigger Clicked");
+
+                    // [FIX] Recalculate Stats NOW based on current view (filtered or not)
+                    // We use 'currentData' (visible items) and 'ftoData' (global internal items)
+                    // If user wants to analyze ONLY visible items, this is correct.
+
+                    if (!rawData || rawData.length === 0) {
+                        alert("No data available to analyze (rawData empty).");
+                        return;
+                    }
+
+                    // [FIX] Use rawData (Full Portfolio) instead of currentData (Filtered View)
+                    // This ensures patent counts are accurate regardless of active filters.
+                    const topics = calculateStrategicStats(rawData, ftoData);
+                    const statsForBackend = topics.map(t => ({
+                        term: t.topic,
+                        openai: t.openai,
+                        anthropic: t.anthropic,
+                        mistral: t.mistral
+                    }));
+
+                    if (statsForBackend.length === 0) {
+                        alert("Analysis requires at least one active topic.");
+                        return;
+                    }
+
+                    const btn = document.getElementById('btn-generate-report');
+                    const status = document.getElementById('report-status');
+                    const container = document.getElementById('strategic-report-content');
+
+                    // UI Loading State
+                    btn.disabled = true;
+                    btn.innerText = "⏳ Analyzing...";
+                    btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                    btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+
+                    status.innerText = "(Thinking...)";
+                    container.innerHTML = '<p class="text-slate-400 italic">Asking Mistral Large to analyze the CURRENT landscape...</p>';
+
+                    console.log("📡 Calling google.script.run.getStrategyReport with fresh stats:", statsForBackend.length);
+
+                    // [FIX] Stringify Payload to prevent Array-to-Object corruption in GAS
+                    const payload = JSON.stringify(statsForBackend);
+
+                    // Call Backend
+                    google.script.run
+                        .withSuccessHandler(markdown => {
+                            console.log("✅ Report Received");
+                            renderStrategicReport(markdown);
+                            btn.innerText = "🔄 Regenerate";
+                            btn.disabled = false;
+                            btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                            btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                            status.innerText = "";
+                        })
+                        .withFailureHandler(e => {
+                            console.error("❌ Report Failed", e);
+                            container.innerHTML = `<p class="text-red-500">Error: ${e.message}</p>`;
+                            status.innerText = "(Failed)";
+                            btn.disabled = false;
+                            btn.innerText = "❌ Retry";
+                            btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                            btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                        })
+                        .getStrategyReport(payload, true); // Send STRINGIFIED payload
+                };
+
+                // [FIX] Helper functions defined OUTSIDE analyzeStrategicLandscape
+                // [REMOVED] Duplicate renderStrategicReport. The robust version is defined at the end of the file.
+
+                function renderCompassChart(data) {
+                    const trace = {
+                        x: data.map(d => d.x),
+                        y: data.map(d => d.y),
+                        text: data.map(d => `<b>${d.term}</b><br>Market: ${Math.round(d.x)}<br>Mistral: ${Math.round(d.y)}<br>Status: ${d.status}`),
+                        mode: 'markers', // [FIX] Hidden text by default
+                        hoverinfo: 'text', // Show text on hover
+                        marker: {
+                            // [FIX] Log Scaled Size to prevent giant bubbles
+                            // size = log(total volume) * factor. Min size 8.
+                            size: data.map(d => Math.max(8, Math.log(d.x + d.y + 1) * 8)),
+                            opacity: 0.7,
+                            color: data.map(d => {
+                                if (d.status.includes('Blue')) return '#3b82f6'; // Blue
+                                if (d.status.includes('Stronghold')) return '#10b981'; // Green
+                                if (d.status.includes('Battleground')) return '#f59e0b'; // Amber
+                                return '#f43f5e'; // Red (Gap) instead of deep red
+                            }),
+                            line: { color: 'white', width: 1 }
+                        },
+                        type: 'scatter'
+                    };
+
+                    const layout = {
+                        title: { text: 'Opportunity Compass (Market vs Mistral)', font: { size: 14 } },
+                        xaxis: { title: 'Market Density (Competitor Mentions)', rangemode: 'tozero' },
+                        yaxis: { title: 'Mistral Presence', rangemode: 'tozero' },
+                        margin: { t: 30, l: 40, r: 20, b: 40 },
+                        hovermode: 'closest',
+                        showlegend: false
+                    };
+
+                    Plotly.newPlot('opportunity-compass', [trace], layout);
+                }
+
+
+                // 4. RENDER TABLE
+                function renderTable(data) {
+                    const tbody = document.getElementById('tableBody');
+                    tbody.innerHTML = '';
+
+                    // We only display top 500, but indices refer to 'currentData'
+                    // NOTE: currentData IS the filtered data.
+                    // If we slice here, we must be careful with indices if we used the slice index.
+                    // But we can just limit the loop and use the index 'i' which matches currentData[i] for the first 500.
+
+                    const LIMIT = 500;
+                    const displayCount = Math.min(data.length, LIMIT);
+
+                    for (let i = 0; i < displayCount; i++) {
+                        const row = data[i]; // Access from currentData directly via idx
+                        const tr = document.createElement('tr');
+                        const compClass = row.Company === 'OpenAI' ? 'comp-openai' : (row.Company === 'Anthropic' ? 'comp-anthropic' : '');
+
+                        tr.innerHTML = `
+                <td>${row.AppDate}</td>
+                <td class="${compClass}">${row.Company}</td>
+                <td style="font-weight:500">${row.Title}</td>
+                <td><span class="badge">${row.Topic}</span></td>
+                <td><small>${row.Inventors}</small></td>
+                <td style="white-space:nowrap;">
+                    <button class="action-btn" onclick="openModalByIndex(${i}, 'Claims')">📜</button>
+                    <button class="action-btn primary-btn" onclick="openModalByIndex(${i}, 'AI Summary')">🧠</button>
+                    <a href="${row.URL}" target="_blank" style="text-decoration:none">🔗</a>
+                </td>
+            `;
+                        tbody.appendChild(tr);
+                    }
+                }
+
+                // 5. SORTING
+                let sortDir = 1;
+                window.sortTable = function (key) {
+                    sortDir *= -1;
+                    currentData.sort((a, b) => {
+                        let valA = a[key];
+                        let valB = b[key];
+                        if (valA < valB) return -1 * sortDir;
+                        if (valA > valB) return 1 * sortDir;
+                        return 0;
+                    });
+                    renderTable(currentData);
+                }
+
+                // 6. UTILS
+                window.resetFilters = function () {
+                    document.getElementById('yearMin').value = 2015;
+                    document.getElementById('yearMax').value = 2026;
+                    document.getElementById('searchTitle').value = '';
+                    document.getElementById('searchInv').value = '';
+                    document.getElementById('topicSelect').value = 'ALL';
+                    updateDashboard();
+                }
+
+                window.openModalByIndex = function (index, type) {
+                    const item = currentData[index];
+                    if (!item) return;
+
+                    let content = "";
+                    if (type === 'Claims') content = item.CleanClaim || "No claims available.";
+                    else if (type === 'AI Summary') content = item.AISummary || "No summary available.";
+
+                    // Basic formatting for readability
+                    content = content.replace(/\n/g, '<br>');
+
+                    document.getElementById('m-title').innerText = type + ": " + item.Title;
+                    document.getElementById('m-body').innerHTML = content;
+                    document.getElementById('detailModal').style.display = 'block';
+                }
+
+                function openModal(title, content) {
+                    // Legacy or direct use
+                    document.getElementById('m-title').innerText = title;
+                    document.getElementById('m-body').innerHTML = content;
+                    document.getElementById('detailModal').style.display = 'block';
+                }
+
+                window.closeModal = function () {
+                    const modal = document.getElementById('detailModal');
+                    if (modal) modal.style.display = 'none';
+                }
+
+                // --- HELP SYSTEM ---
+                const DASHBOARD_HELP = {
+                    radar: {
+                        title: "Strategic Radar (PCA)",
+                        how: "Google Drive JSONs + Mistral Embeddings",
+                        inputs: "Patent 'CleanClaim' text converted into 1024D vectors.",
+                        metrics: "Principal Component Analysis (PCA) reduces vectors to 2D coordinates.",
+                        why: "To identify technical clusters and white space opportunities visually.",
+                        extended: [
+                            { tag: "SOURCE", val: "Reads 'mistral_embeddings.json' from 'Competitor Radar' folder." },
+                            { tag: "PRE-PROC", val: "Claims are extracted and normalized (lowercase, punctuation removed)." },
+                            { tag: "PROCESS", val: "Mistral-embed model used for 1024D vectors. PCA logic project these to 2D." },
+                            { tag: "POST-PROC", val: "K-Means clustering automatically identifies and colors theme groups." }
+                        ]
+                    },
+                    proximity: {
+                        title: "Market Proximity",
+                        how: "Google Apps Script logic + AI Summaries",
+                        inputs: "Dates, Companies, and AI-distilled patent descriptions.",
+                        metrics: "Chronological audit listing with deep-dive icons.",
+                        why: "To perform tactical review of specific competitor patents.",
+                        extended: [
+                            { tag: "SOURCE", val: "Iterates through subfolders in 'Competitor Patents' by company name." },
+                            { tag: "PRE-PROC", val: "Parses filenames for Application Numbers and Patent Titles." },
+                            { tag: "PROCESS", val: "Aggregates 'AISummary.txt' files from each patent folder into a master list." },
+                            { tag: "POST-PROC", val: "Sorting by AppDate descending to ensure 'Freshness' prioritization." }
+                        ]
+                    },
+                    skills: {
+                        title: "Strategic Skill Landscape",
+                        how: "Topic Classifier Output",
+                        inputs: "Count of patents per technical domain cluster.",
+                        metrics: "Portfolio Volume Distribution (Horizontal Bars).",
+                        why: "To compare 'skill depth' between competitors across technologies.",
+                        extended: [
+                            { tag: "SOURCE", val: "Mistral Classifier tags attached to each patent JSON." },
+                            { tag: "PRE-PROC", val: "Categorizes patents based on internal Technical Taxonomy." },
+                            { tag: "PROCESS", val: "Pivot counts by (Company, Topic) to create comparative chart data." },
+                            { tag: "POST-PROC", val: "Normalized bars show relative strength even with unequal portfolio sizes." }
+                        ]
+                    },
+                    wordcloud: {
+                        title: "Strategic Word Cloud",
+                        how: "NLP Term Frequency Density",
+                        inputs: "AI-generated patent summaries and internal inventions.",
+                        metrics: "Density: (Term Count / Total Words) * 1000, 1:5 font ratio.",
+                        why: "To identify the dominant technical vocabulary of the landscape.",
+                        extended: [
+                            { tag: "SOURCE", val: "Collects text from all 'AISummary' (Competitors) and 'Markdown' (Internal)." },
+                            { tag: "PRE-PROC", val: "StopWord filter removes ~200 legal and non-technical filler words." },
+                            { tag: "PROCESS", val: "Weighted Frequency: 1.0 (Summary) vs 0.5 (Background) to favor technicality." },
+                            { tag: "POST-PROC", val: "Dynamic Scaling maps weight [min, max] to font size [12px, 60px]." }
+                        ]
+                    },
+                    matrix: {
+                        title: "Opportunity Matrix",
+                        how: "Density Normalization",
+                        inputs: "Patent count normalized across the taxonomy.",
+                        metrics: "Relative Density (High = Combat, Low = White Space).",
+                        why: "To locate high-value areas with lower competitive resistance.",
+                        extended: [
+                            { tag: "SOURCE", val: "Uses the aggregated 'Topic' labels from the entire patent registry." },
+                            { tag: "PRE-PROC", val: "Groups patents by year to track moving density vs static total." },
+                            { tag: "PROCESS", val: "Calculates 'Competition Index': High Count = Red, Low Count = Blue." },
+                            { tag: "POST-PROC", val: "Inverts scores so 'High Opportunity' aligns with low competitor signals." }
+                        ]
+                    },
+                    swot: {
+                        title: "Intelligence Briefing (SWOT)",
+                        how: "Mistral Large LLM Reasoner",
+                        inputs: "Global Patent Registry vs Internal Invention Summaries.",
+                        metrics: "AI synthesis of Strategic Strengths & Weaknesses (Top 100 signals).",
+                        why: "To transform raw data into high-level business strategy.",
+                        extended: [
+                            { tag: "SOURCE", val: "Mistral: Aggregates all invention summaries. Competitors: Aggregates Independent Claims." },
+                            { tag: "PRE-PROC", val: "Claims are extracted and trimmed to fit LLM window while preserving technical novelty." },
+                            { tag: "PROCESS", val: "Prompted to identify competitive advantages vs technological gaps in current filings." },
+                            { tag: "POST-PROC", val: "Generated JSON is parsed into Strengths/Weaknesses/Opportunities/Threats." }
+                        ]
+                    },
+                    fto: {
+                        title: "Invention vs Landscape (FTO)",
+                        how: "Vector Search + Hybrid LLM Audit",
+                        inputs: "Internal Inventions vs Global Patent Database.",
+                        metrics: "Semantic Distance Score + Mistral Small claim verification.",
+                        why: "To detect patent overlaps before proceeding to R&D.",
+                        extended: [
+                            { tag: "SOURCE", val: "Fetches invention Markdown from 'Mistral OCR' folder." },
+                            { tag: "PRE-PROC", val: "Splits invention into 'Claim 1' (Independent) for focused matching." },
+                            { tag: "PROCESS", val: "Step 1: FAISS/Vector Search (Rank Top 5). Step 2: Mistral Validation." },
+                            { tag: "POST-PROC", val: "Confidence score (0-100) based on specific technical matches detected." }
+                        ]
+                    }
+                };
+
+                window.showHelp = function (section) {
+                    const data = DASHBOARD_HELP[section];
+                    if (!data) return;
+                    const body = document.getElementById('h-body');
+
+                    let extendedHtml = "";
+                    if (data.extended) {
+                        extendedHtml = `
+                            <div id="tech-details" class="tech-block">
+                                <div style="color:#10b981; font-weight:bold; margin-bottom:10px; font-size:1.1em;">⚙️ Technical Data Chain:</div>
+                                ${data.extended.map(step => `
+                                    <div class="tech-step">
+                                        <span class="tech-tag">[${step.tag}]</span> ${step.val}
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div style="margin-top:15px; text-align:center;">
+                                <button id="btn-toggle-tech" onclick="toggleTechDetails()" 
+                                    style="background:none; border:1px dashed #cbd5e1; color:#64748b; padding:6px 15px; border-radius:4px; font-size:0.85em; cursor:pointer; transition:all 0.2s;">
+                                    🔍 Show Extended Technical Details
+                                </button>
+                            </div>
+                        `;
+                    }
+
+                    body.innerHTML = `
+                        <p style="color:#64748b; font-size:0.95em; line-height:1.5; margin-bottom:20px;">
+                            Methodology used to generate the <b>${data.title}</b> view.
+                        </p>
+                        <div class="help-grid">
+                            <div class="help-card">
+                                <span class="help-label">🛠️ How it's built</span>
+                                <div style="font-size:0.9em; color:#334155;">${data.how}</div>
+                            </div>
+                            <div class="help-card">
+                                <span class="help-label">📥 Input Data</span>
+                                <div style="font-size:0.9em; color:#334155;">${data.inputs}</div>
+                            </div>
+                            <div class="help-card">
+                                <span class="help-label">📈 Metrics / Outputs</span>
+                                <div style="font-size:0.9em; color:#334155;">${data.metrics}</div>
+                            </div>
+                            <div class="help-card" style="border-left-color: #10b981;">
+                                <span class="help-label">🎯 Strategic Rationale</span>
+                                <div style="font-size:0.9em; color:#334155;">${data.why}</div>
+                            </div>
+                        </div>
+                        ${extendedHtml}
+                    `;
+                    document.getElementById('helpModal').style.display = 'block';
+                }
+
+                window.toggleTechDetails = function () {
+                    const block = document.getElementById('tech-details');
+                    const btn = document.getElementById('btn-toggle-tech');
+                    if (block.style.display === 'block') {
+                        block.style.display = 'none';
+                        btn.innerText = "🔍 Show Extended Technical Details";
+                        btn.style.borderColor = "#cbd5e1";
+                        btn.style.color = "#64748b";
+                    } else {
+                        block.style.display = 'block';
+                        btn.innerText = "🚀 Hide Technical Chain";
+                        btn.style.borderColor = "#10b981";
+                        btn.style.color = "#10b981";
+                    }
+                }
+
+                window.closeHelpModal = function () {
+                    document.getElementById('helpModal').style.display = 'none';
+                }
+
+                window.onclick = function (event) {
+                    const m1 = document.getElementById('detailModal');
+                    const m2 = document.getElementById('helpModal');
+                    if (event.target == m1) m1.style.display = "none";
+                    if (event.target == m2) m2.style.display = "none";
+                }
+                // [REMOVED] Duplicate scrollToFTO (Better version at 2111)
+
+                // ----------------------------------------------------
+                // 🔄 RESTORE CACHED STATE
+                // ----------------------------------------------------
+                // ----------------------------------------------------
+                // 🔄 RESTORE CACHED STATE
+                // ----------------------------------------------------
+                // [REMOVED] Duplicate renderCachedReports (Mapping version at 2668)
+
+                // GLOBAL REGISTRY
+                window.ftoRegistry = {};
+
+                function renderFTO(report, scannedCount) {
+                    const container = document.getElementById('fto-container');
+                    const section = document.getElementById('fto-section');
+                    const badge = document.getElementById('fto-badge');
+                    const countSpan = document.getElementById('fto-count');
+
+                    // 1. HEADER BADGE (Now shows "Inventions")
+                    if (report.length > 0) {
+                        badge.style.display = 'block';
+                        // [NEW] Add Global Analyze Button
+                        badge.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span id="fto-count-text">${report.length} Inventions Scanned</span>
+                            <button id="btn-analyze-all" class="action-btn" style="background:#dc2626; color:white; border:none; margin-left:15px;" onclick="triggerGlobalAnalysis()">
+                                ⚡ Analyze All & Rank Similarity
+                            </button>
+                        </div>
+                    `;
+                        badge.style.background = "#dbeafe";
+                        badge.style.color = "#1e40af";
+                    } else {
+                        badge.style.display = 'none';
+                    }
+
+                    // 2. MAIN CONTENT
+                    if (report.length === 0 && scannedCount === 0) {
+                        container.innerHTML = `<div style="padding:20px; text-align:center; color:#64748b;">
+                    <i>No internal inventions found to analyze. Check "Invention Folder".</i>
+                 </div>`;
+                        return;
+                    }
+
+                    // 3. RENDER LIST
+                    let html = "";
+
+                    report.forEach((inv, idx) => {
+                        // 1. Calculate Average Score
+                        // Prioritize Deep Analysis (Cached) over Vector Similarity
+                        const invIdForCache = inv.FolderName || inv.inventionName;
+                        const cachedInvData = window.ftoAnalyses ? window.ftoAnalyses[invIdForCache] : null;
+
+                        let scoresPerMatch = (inv.matches || []).map(m => {
+                            const pId = m.patentNumber || m.num;
+                            if (cachedInvData && cachedInvData[pId]) return cachedInvData[pId].score;
+                            return parseInt(m.similarity) || 0;
+                        });
+
+                        const avgScore = scoresPerMatch.length > 0 ? Math.round(scoresPerMatch.reduce((a, b) => a + b, 0) / scoresPerMatch.length) : 0;
+
+                        // Color code average
+                        let avgColor = '#10b981'; // Green
+                        if (avgScore > 70) avgColor = '#dc2626'; // Red
+                        else if (avgScore > 40) avgColor = '#f59e0b'; // Amber
+
+                        // Escape simple quotes for HTML attribute safety
+                        const safeSum = encodeURIComponent(inv.summaryText || "");
+
+                        // [NEW] Display Folder Name (MIST-XXXX) if available
+                        const titleDisplay = inv.FolderName ? `📁 ${inv.FolderName} <span style="color:#94a3b8; font-weight:normal;">(${inv.inventionName})</span>` : `📱 ${inv.inventionName}`;
+                        const invRowId = `inv-container-${idx}`;
+
+                        html += `
+                <details id="${invRowId}" class="fto-item-container" data-score="${avgScore}" style="border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px; box-shadow:0 1px 2px rgba(0,0,0,0.05); background:white;">
+                    <summary style="padding:15px; border-bottom:1px solid #e2e8f0; cursor:pointer; list-style:none; outline:none;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='white'">
+                         <div style="display:flex; justify-content:space-between; align-items:center;">
+                             <div style="font-size:1.0em; font-weight:bold; color:#1e293b;">
+                                ${titleDisplay}
+                             </div>
+                             <div style="display:flex; align-items:center; gap:15px;">
+                                <div style="font-size:0.9em; font-weight:bold; color:${avgColor}; background:${avgColor}15; padding:4px 10px; border-radius:20px;">
+                                    Avg Sim: ${avgScore}%
+                                </div>
+                                <span style="color:#cbd5e1;">▼</span>
+                             </div>
+                         </div>
+                    </summary>
+                    
+                    <div style="padding:15px; background:#f8fafc;">
+                        <div style="margin-bottom:10px; font-size:0.9em;">
+                            <a href="${inv.inventionLink}" target="_blank" style="color:#2563eb; text-decoration:none;">📄 View Source Document</a>
+                        </div>
+                        <table style="width:100%; border-collapse:collapse; font-size:0.9em; background:white; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                           <tr style="background:#f1f5f9; color:#64748b; font-size:0.85em; text-transform:uppercase;">
+                               <th style="padding:10px; text-align:left;">Match Similarity</th>
+                               <th style="padding:10px; text-align:left;">Competitor Patent</th>
+                               <th style="padding:10px; text-align:left;">Company</th>
+                               <th style="padding:10px; text-align:right;">Compare</th>
+                           </tr>
+                `;
+
+                        if (!inv.matches || inv.matches.length === 0) {
+                            html += `<tr><td colspan="4" style="padding:20px; text-align:center;">No close matches found.</td></tr>`;
+                        } else {
+                            const invId = inv.FolderName || inv.inventionName;
+                            const cachedInv = window.ftoAnalyses ? window.ftoAnalyses[invId] : null;
+
+                            inv.matches.forEach((match, mIdx) => {
+                                const rowId = `row-${idx}-${mIdx}`;
+                                const resId = `res-${idx}-${mIdx}`;
+                                const claimId = `claim-${idx}-${mIdx}`;
+                                const patId = match.patentNumber || match.num;
+
+                                // [NEW] Check Cache for this specific match
+                                const cachedMatch = cachedInv ? cachedInv[patId] : null;
+                                let btnHtml = "⚡ Compare";
+                                let btnStyle = "";
+                                if (cachedMatch) {
+                                    const cScore = cachedMatch.score;
+                                    btnHtml = `✅ Sim: <b>${cScore}%</b>`;
+                                    const cColor = cScore > 70 ? '#dc2626' : (cScore > 30 ? '#f59e0b' : '#10b981');
+                                    btnStyle = `background:${cColor}; color:white; border:none;`;
+
+                                    // [FIX] Update parent score if cached value is higher
+                                    if (cScore > avgScore) {
+                                        // This is a bit tricky since avgScore is calculated above. 
+                                        // We might want to recalculate the whole invention score based on cache.
+                                    }
+                                }
+
+                                // STORE DATA SAFELY
+                                window.ftoRegistry[rowId] = {
+                                    summary: inv.summaryText || "",
+                                    claim: match.patentClaim || "",
+                                    cached: cachedMatch // Store cache in registry
+                                };
+
+                                html += `
+                         <tr style="border-bottom:1px solid #f1f5f9;">
+                             <td style="padding:12px 15px;">
+                                 <div style="display:flex; align-items:center gap:10px;">
+                                     <div style="width:40px; background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden; margin-right:8px;">
+                                         <div style="background:${parseInt(match.similarity) > 75 ? '#ef4444' : '#3b82f6'}; width:${match.similarity}; height:100%;"></div>
+                                     </div>
+                                     <strong>${match.similarity}</strong>
+                                 </div>
+                             </td>
+                             <td style="padding:12px 15px;">
+                                 <div style="font-weight:600;">${match.patentTitle}</div>
+                                 <div style="margin-top:4px;">
+                                     <a href="${match.patentLink}" target="_blank" style="color:#64748b; font-size:0.85em;">${match.patentNumber}</a>
+                                     <span style="margin:0 5px; color:#cbd5e1;">|</span>
+                                     <a href="javascript:void(0)" onclick="toggleClaim('${claimId}')" style="color:#2563eb; font-size:0.85em; text-decoration:none;">📜 View Claim</a>
+                                 </div>
+                                 <div id="${claimId}" style="display:none; margin-top:8px; background:#fff; padding:8px; border:1px solid #e2e8f0; border-radius:4px; font-size:0.85em; color:#475569; max-height:150px; overflow-y:auto;">
+                                     <strong>Independent Claim:</strong><br>
+                                     ${match.patentClaim || "No claim text available."}
+                                 </div>
+                             </td>
+                             <td style="padding:12px 15px;">
+                                 <span class="badge" style="background:${match.patentCompany === 'Anthropic' ? '#fee2e2' : '#dbeafe'}; color:${match.patentCompany === 'Anthropic' ? '#b91c1c' : '#1e40af'}">
+                                    ${match.patentCompany}
+                                 </span>
+                             </td>
+                             <td style="padding:12px 15px; text-align:right;">
+                                 <button class="action-btn primary-btn" id="btn-${rowId}" 
+                                    style="${btnStyle}"
+                                    onclick="triggerAnalysisRegistry('${rowId}', '${resId}')">
+                                    ${btnHtml}
+                                 </button>
+                             </td>
+                         </tr>
+                         <tr id="${resId}" style="display:none; background:#f8fafc;">
+                             <td colspan="4" style="padding:15px;">
+                                 <!-- RESULT AREA -->
+                             </td>
+                         </tr>
+                         `;
+                            });
+                        }
+
+                        html += `</table></div></details>`;
+                    });
+
+                    container.innerHTML = html;
+                }
+
+                // ----------------------------------------------------
+                // 📜 SCROLL HELPERS
+                // ----------------------------------------------------
+                function scrollToFTO() {
+                    console.log("🖱️ Scroll to FTO Triggered");
+                    const section = document.getElementById('fto-section');
+                    if (section) {
+                        console.log("   ✅ Section found, scrolling...");
+                        section.style.display = 'block';
+                        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                        // Visual Cue
+                        section.style.border = "2px solid #ef4444";
+                        setTimeout(() => { section.style.border = "none"; }, 2000);
+                    } else {
+                        console.error("   ❌ FTO Section NOT found in DOM");
+                        alert("Error: FTO Report section not found. Please check if analysis ran correctly.");
+                    }
+                }
+
+                // ----------------------------------------------------
+                // 🌍 GLOBAL ANALYSIS QUEUE
+                // ----------------------------------------------------
+                window.globalQueue = [];
+                window.isGlobalRunning = false;
+
+                window.triggerGlobalAnalysis = function () {
+                    if (!confirm("⚠️ This will run deep analysis on ALL matches. It may take several minutes.\n\nKeep the tab open.")) return;
+
+                    const btn = document.getElementById('btn-analyze-all');
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerText = "⏳ Processing Queue...";
+                        btn.style.background = "#94a3b8";
+                    }
+
+                    // 1. Build Queue
+                    const buttons = document.querySelectorAll('button[id^="btn-row-"]');
+                    window.globalQueue = [];
+
+                    buttons.forEach(b => {
+                        const rowId = b.id.replace('btn-', '');
+                        const resId = rowId.replace('row-', 'res-');
+                        // Only add if not disabled (already running/done)
+                        if (!b.disabled) {
+                            window.globalQueue.push({ rowId: rowId, resId: resId });
+                        }
+                    });
+
+                    console.log(`🌍 Global Queue Started: ${window.globalQueue.length} items.`);
+                    window.isGlobalRunning = true;
+                    processGlobalQueue();
+                }
+
+                function processGlobalQueue() {
+                    if (window.globalQueue.length === 0) {
+                        console.log("✅ Global Queue Finished.");
+                        const btn = document.getElementById('btn-analyze-all');
+                        if (btn) {
+                            btn.innerText = "✅ Analysis & Ranking Complete";
+                            btn.style.background = "#16a34a";
+                        }
+                        window.isGlobalRunning = false;
+                        // Final Sort
+                        updateFTORanking();
+                        return;
+                    }
+
+                    const item = window.globalQueue.shift();
+                    console.log(`   Processing ${item.rowId}... (${window.globalQueue.length} remaining)`);
+
+                    // Trigger logic with callback Loop
+                    triggerAnalysisRegistry(item.rowId, item.resId, () => {
+                        // This callback runs when ONE item finishes 
+                        updateFTORanking(); // Live sort!
+                        setTimeout(processGlobalQueue, 1000); // 1s buffer
+                    });
+                }
+
+                function updateFTORanking() {
+                    // Sort the DIVs based on data-score (Highest Risk First)
+                    const container = document.getElementById('fto-container');
+                    const items = Array.from(container.querySelectorAll('.fto-item-container'));
+
+                    items.sort((a, b) => {
+                        return parseFloat(b.dataset.score) - parseFloat(a.dataset.score);
+                    });
+
+                    items.forEach(item => container.appendChild(item));
+                }
+
+                // INTERACTIVE CALL (REGISTRY PATTERN - PROGRESSIVE)
+                window.triggerAnalysisRegistry = function (rowId, resId, onCompleteCallback, force = false) {
+                    const data = window.ftoRegistry[rowId];
+                    if (!data) { alert("Error: Data not found in registry"); return; }
+
+                    const btn = document.getElementById("btn-" + rowId);
+                    const resRow = document.getElementById(resId);
+                    const resCell = resRow.querySelector('td');
+
+                    // [NEW] TOGGLE LOGIC: If already visible, hide it and return
+                    if (!force && resRow.style.display === "table-row") {
+                        console.log("🙈 Hiding " + rowId);
+                        resRow.style.display = "none";
+                        // Reset opacity/state if needed, though usually fine to keep button as is
+                        return;
+                    }
+
+                    btn.disabled = true;
+                    btn.innerText = force ? "🔄 Updating..." : "⏳ Scanning...";
+                    btn.style.opacity = "0.7";
+                    resRow.style.display = "table-row";
+
+                    // [NEW] CHECK CONSOLIDATED CACHE FIRST
+                    if (!force && data.cached && data.cached.claims) {
+                        console.log("🚀 Rendering Consolidated Cache Instantly for " + rowId);
+
+                        let html = `<div style="padding:10px; background:#f0f9ff; border-radius:6px; margin-bottom:15px; font-size:0.9em; color:#0369a1; display:flex; justify-content:space-between; align-items:center;">
+                            <span>📦 Loaded from <b>Deep Analysis Cache</b> (${data.cached.date})</span>
+                            <a href="javascript:void(0)" onclick="triggerAnalysisRegistry('${rowId}', '${resId}', null, true)" style="color:#64748b; text-decoration:none;">🔄 Force Refresh</a>
+                        </div>`;
+
+                        data.cached.claims.forEach(cl => {
+                            html += `<div id="claim-res-${rowId}-${cl.num}" style="margin-bottom:10px; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
+                                <div style="background:#f1f5f9; padding:8px 12px; font-weight:bold; color:#475569; display:flex; justify-content:space-between;">
+                                    <span>🏛️ Claim ${cl.num}</span>
+                                    <span style="color:#16a34a;">✅ Cached</span>
+                                </div>
+                                <div id="content-${rowId}-${cl.num}" style="padding:12px;">
+                                    ${renderClaimChartTable(cl.data || cl.chart)}
+                                </div>
+                            </div>`;
+                        });
+
+                        resCell.innerHTML = html;
+                        btn.innerHTML = `✅ Sim: <b>${data.cached.score}%</b>`;
+                        btn.disabled = false;
+                        btn.style.opacity = "1";
+                        const cColor = data.cached.score > 70 ? '#dc2626' : (data.cached.score > 30 ? '#f59e0b' : '#10b981');
+                        btn.style.background = cColor;
+
+                        if (onCompleteCallback) onCompleteCallback();
+                        return;
+                    }
+
+                    resCell.innerHTML = `<div style="text-align:center; padding:20px; color:#64748b;">
+                        <div style="margin-bottom:10px;">🔍 Identifying Independent Claims...</div>
+                    </div>`;
+
+                    // 1. Get List of Claims 
+                    google.script.run
+                        .withSuccessHandler(function (claims) {
+                            if (!claims || claims.length === 0) {
+                                resCell.innerHTML = `<div style="color:red; padding:10px;">❌ No claims found to analyze.</div>`;
+                                btn.innerText = "❌ Error";
+                                if (onCompleteCallback) onCompleteCallback();
+                                return;
+                            }
+
+                            // 2. Setup Progressive Display
+                            let html = `<div style="padding:10px; background:#f0f9ff; border-radius:6px; margin-bottom:15px; font-size:0.9em; color:#0369a1;">
+                                Found <b>${claims.length}</b> Independent Claims. Analyzing sequentially...
+                            </div>`;
+
+                            claims.forEach(c => {
+                                html += `<div id="claim-res-${rowId}-${c.num}" style="margin-bottom:10px; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
+                                    <div style="background:#f1f5f9; padding:8px 12px; font-weight:bold; color:#475569; display:flex; justify-content:space-between;">
+                                        <span>🏛️ Claim ${c.num}</span>
+                                        <span id="status-${rowId}-${c.num}" style="color:#ca8a04;">⏳ Pending...</span>
+                                    </div>
+                                    <div id="content-${rowId}-${c.num}" style="padding:12px;"></div>
+                                </div>`;
+                            });
+                            resCell.innerHTML = html;
+                            btn.innerText = "⏳ Analyzing...";
+
+                            // 3. Chain Analysis Calls
+                            processClaimQueue(rowId, data.summary, claims, 0, btn, [], onCompleteCallback, force);
+                        })
+                        .withFailureHandler((err) => {
+                            btn.innerText = "❌ Error";
+                            resCell.innerHTML = `<div style="color:red; padding:10px;">Server Error: ${err.message}</div>`;
+                            if (onCompleteCallback) onCompleteCallback();
+                        })
+                        .extractIndependentClaims(data.claim);
+                }
+
+                function processClaimQueue(rowId, summary, claims, index, btn, scores = [], onCompleteCallback, force = false, currentResults = []) {
+                    if (index >= claims.length) {
+                        // 1. Calculate Score
+                        const totalScore = scores.reduce((sum, s) => sum + s, 0);
+                        const avgRisk = Math.round(totalScore / (scores.length || 1));
+
+                        // 2. Update Button UI
+                        btn.innerHTML = `✅ Similarity: <b>${avgRisk}%</b>`;
+                        btn.style.opacity = "1";
+                        if (avgRisk > 70) btn.style.background = "#dc2626";
+                        else if (avgRisk > 30) btn.style.background = "#f59e0b";
+                        else btn.style.background = "#10b981";
+
+                        // 3. Persist to Backend Cache
+                        try {
+                            const parts = rowId.split('-'); // row-INV_IDX-MATCH_IDX
+                            const invIdx = parts[1];
+                            const matchIdx = parts[2];
+
+                            const invention = ftoData[invIdx];
+                            const match = invention.matches[matchIdx];
+                            const invId = invention.FolderName || invention.inventionName;
+                            const patId = match.patentNumber || match.num;
+
+                            console.log(`💾 Persisting Analysis: ${invId} vs ${patId}`);
+                            google.script.run
+                                .withSuccessHandler(() => console.log("   ✅ Cache Update Success"))
+                                .saveConsolidatedFTOAnalysis(invId, patId, avgRisk, currentResults);
+                        } catch (e) { console.error("❌ Persistence failed:", e); }
+
+                        // 4. Update Parent Invention Score
+                        const invIdx = rowId.split('-')[1];
+                        const container = document.getElementById(`inv-container-${invIdx}`);
+                        if (container) {
+                            const currentMax = parseFloat(container.dataset.score) || 0;
+                            if (avgRisk > currentMax) {
+                                container.dataset.score = avgRisk;
+                            }
+                        }
+
+                        if (onCompleteCallback) onCompleteCallback();
+                        return;
+                    }
+
+                    const c = claims[index];
+                    const statusSpan = document.getElementById(`status-${rowId}-${c.num}`);
+                    const contentDiv = document.getElementById(`content-${rowId}-${c.num}`);
+
+                    statusSpan.innerText = force ? "🔄 Updating..." : "🔄 Analyzing...";
+                    statusSpan.style.color = "#2563eb";
+
+                    google.script.run
+                        .withSuccessHandler((response) => {
+                            let result = [];
+                            let cachedDate = null;
+
+                            if (response && response.chart && Array.isArray(response.chart)) {
+                                result = response.chart;
+                                cachedDate = response.cachedAt;
+                            } else if (Array.isArray(response)) {
+                                result = response;
+                            } else if (response.error) {
+                                result = { error: response.error };
+                            }
+
+                            statusSpan.innerText = "✅ Complete";
+                            statusSpan.style.color = "#16a34a";
+
+                            let claimScore = 0;
+                            if (result && Array.isArray(result)) {
+                                let yes = 0, maybe = 0, total = 0;
+                                result.forEach(r => {
+                                    if (r.verdict !== 'INFO') {
+                                        total++;
+                                        const v = (r.verdict || "").toLowerCase();
+                                        if (v.includes('yes')) yes++;
+                                        else if (v.includes('maybe')) maybe++;
+                                    }
+                                });
+                                if (total > 0) claimScore = ((yes * 100) + (maybe * 50)) / total;
+                            }
+                            scores.push(claimScore);
+
+                            if (result.error) {
+                                contentDiv.innerHTML = `<div style="color:red;">Error: ${result.error}</div>`;
+                            } else {
+                                let html = renderClaimChartTable(result);
+                                if (cachedDate) {
+                                    html += `<div style="margin-top:10px; border-top:1px solid #e2e8f0; padding-top:5px; font-size:0.8em; color:#94a3b8; display:flex; justify-content:space-between; align-items:center;">
+                                    <span>🕒 Cached: ${cachedDate}</span>
+                                    <a href="javascript:void(0)" onclick="triggerAnalysisRegistry('${rowId}', 'res-${rowId}', null, true)" style="color:#64748b; text-decoration:none;">🔄 Force Update</a>
+                                </div>`;
+                                }
+                                contentDiv.innerHTML = html;
+                            }
+
+                            // Next step with results aggregation
+                            processClaimQueue(rowId, summary, claims, index + 1, btn, scores, onCompleteCallback, force, [...currentResults, { num: c.num, data: result, cachedAt: cachedDate }]);
+                        })
+                        .withFailureHandler((err) => {
+                            statusSpan.innerText = "❌ Failed";
+                            contentDiv.innerHTML = `<div style="color:red;">${err.message}</div>`;
+                            scores.push(0);
+                            processClaimQueue(rowId, summary, claims, index + 1, btn, scores, onCompleteCallback, force, currentResults);
+                        })
+                        .analyzeSingleClaim(summary, c.num, c.text, force);
+                }
+
+                function renderClaimChartTable(chart) {
+                    if (!Array.isArray(chart)) return `<div style="color:red; font-size:0.8em;">⚠️ Analysis Error: ${JSON.stringify(chart)}</div>`;
+
+                    let rows = chart.map(row => {
+                        // [NEW] Header Row for Multi-Claim Analysis
+                        if (row.verdict === 'INFO') {
+                            return `
+                    <tr style="background:#e2e8f0; border-top:2px solid #cbd5e1;">
+                        <td colspan="3" style="padding:10px; font-weight:bold; color:#1e293b; text-align:center;">
+                            ${row.feature}
+                        </td>
+                    </tr>`;
+                        }
+
+                        let color = row.verdict.toLowerCase().includes('yes') ? '#fee2e2' : (row.verdict.toLowerCase().includes('maybe') ? '#ffedd5' : '#dcfce7');
+                        return `
+                 <tr>
+                    <td style="width:30%; font-size:0.85em;">${row.feature}</td>
+                    <td style="width:10%; font-weight:bold; background:${color}; text-align:center;">${row.verdict}</td>
+                    <td style="width:60%; font-size:0.85em;">
+                        <i>"${row.evidence || 'No evidence'}"</i><br>
+                        <span style="color:#475569;">${row.explanation || ''}</span>
+                    </td>
+                 </tr>
+                 `;
+                    }).join('');
+
+                    return `
+             <table style="width:100%; border:1px solid #e2e8f0; font-size:0.85em; margin-top:10px;">
+                <tr style="background:#f1f5f9;">
+                    <th>Element</th>
+                    <th>Evaluation</th>
+                    <th>Evidence & Reasoning</th>
+                </tr>
+                ${rows}
+             </table>
+             `;
+                }
+                window.toggleClaim = function (id) {
+                    const el = document.getElementById(id);
+                    if (el.style.display === 'none') el.style.display = 'block';
+                    else el.style.display = 'none';
+                }
+
+                // ----------------------------------------------------
+                // 🧠 SWOT LOGIC
+                // ----------------------------------------------------
+                // ----------------------------------------------------
+                // 🧠 SWOT LOGIC
+                // ----------------------------------------------------
+                // 🧠 SWOT LOGIC
+                // ----------------------------------------------------
+                window.triggerSWOT = function (targetCompany, targetResultId, btnElement, force = false) { // [UPD] Added force
+                    // Support both old way (no args) and new way (explicit args)
+
+                    let company = targetCompany;
+                    let resId = targetResultId || 'swot-result';
+                    let btn = btnElement || document.getElementById('btn-swot');
+
+                    // If called from old button with no args, infer from tab
+                    if (!company) {
+                        if (activeTab === 'anthropic') company = "Anthropic";
+                        else if (activeTab === 'openai') company = "OpenAI";
+                        else if (activeTab === 'overview') company = "Mistral";
+                        else {
+                            alert("Please select Overview, Anthropic or OpenAI tab first.");
+                            return;
+                        }
+                    }
+
+                    const res = document.getElementById(resId);
+
+                    btn.disabled = true;
+                    btn.innerText = force ? "🔄 Updating..." : "⏳ Generating Strategic Analysis... (takes ~30s)";
+                    if (!force) res.style.display = 'none'; // Keep visible if refreshing
+
+                    google.script.run
+                        .withSuccessHandler((response) => {
+                            btn.innerText = `✨ Regenerate SWOT for ${company}`; // Keep the text user sees
+                            btn.disabled = false;
+
+                            let data = response;
+                            let cachedDate = null;
+
+                            if (response && response.content) {
+                                data = response.content;
+                                cachedDate = response.cachedAt;
+                            } else if (response.error) {
+                                alert("SWOT Generation Failed: " + response.error);
+                                btn.innerText = "❌ Error";
+                                return;
+                            }
+
+                            renderSWOT(data, resId, cachedDate, company); // [UPD] Pass metadata
+                        })
+                        .withFailureHandler((err) => {
+                            btn.innerText = "❌ Error";
+                            btn.disabled = false;
+                            alert("SWOT Generation Failed: " + err.message);
+                        })
+                        // Call Backend
+                        // [FIX] Pass ftoData if Mistral, and FORCE param
+                        .generateSWOT(company, 50, (company === 'Mistral' ? ftoData : []), force);
+                }
+
+                function renderSWOT(data, targetContainerId, cachedDate, company) {
+                    console.log(`🎨 [SWOT] Rendering for ${company} into ${targetContainerId}`);
+
+                    if (!data) {
+                        console.error("❌ [SWOT] Data is null/undefined!");
+                        return;
+                    }
+
+                    const containerId = targetContainerId || 'swot-result';
+                    const res = document.getElementById(containerId);
+
+                    if (!res) {
+                        console.error(`❌ [SWOT] Container #${containerId} NOT FOUND inside DOM!`);
+                        return;
+                    }
+
+                    // FORCE VISIBILITY (Aggressive)
+                    res.style.display = 'block';
+                    res.style.visibility = 'visible';
+                    res.style.opacity = '1';
+                    res.removeAttribute('hidden');
+                    console.log(`   ✅ Container #${containerId} forced to display:block`);
+
+                    if (data.error) {
+                        res.innerHTML = `<div style="color:red; padding:10px;">${data.error}</div>`;
+                        return;
+                    }
+
+                    // Normalization: specific key content vs raw input
+                    const content = data.content || data;
+
+                    const renderList = (items) => {
+                        if (!items || items.length === 0) return "<li style='color:#94a3b8; font-style:italic;'>No significant points identified.</li>";
+                        return items.map(i => `<li>${i}</li>`).join('');
+                    };
+
+                    const html = `
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; text-align:left;">
+                <div class="swot-box" style="background:#f0fdf4; border:1px solid #bbf7d0; padding:10px; border-radius:6px;">
+                    <h4 style="color:#166534; margin-top:0;">💪 Strengths</h4>
+                    <ul style="padding-left:20px; color:#14532d; margin-bottom:0;">${renderList(content.strengths)}</ul>
+                </div>
+                <div class="swot-box" style="background:#fef2f2; border:1px solid #fecaca; padding:10px; border-radius:6px;">
+                    <h4 style="color:#991b1b; margin-top:0;">🔻 Weaknesses</h4>
+                    <ul style="padding-left:20px; color:#7f1d1d; margin-bottom:0;">${renderList(content.weaknesses)}</ul>
+                </div>
+                <div class="swot-box" style="background:#eff6ff; border:1px solid #bfdbfe; padding:10px; border-radius:6px;">
+                    <h4 style="color:#1e40af; margin-top:0;">🌟 Opportunities</h4>
+                    <ul style="padding-left:20px; color:#1e3a8a; margin-bottom:0;">${renderList(content.opportunities)}</ul>
+                </div>
+                <div class="swot-box" style="background:#fff7ed; border:1px solid #fed7aa; padding:10px; border-radius:6px;">
+                    <h4 style="color:#9a3412; margin-top:0;">⚠️ Threats</h4>
+                    <ul style="padding-left:20px; color:#7c2d12; margin-bottom:0;">${renderList(content.threats)}</ul>
+                </div>
+            </div>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:0.8em; color:#94a3b8; border-top:1px solid #e2e8f0; padding-top:5px;">
+                <span>Generated by Mistral Large ${cachedDate ? ' • 🕒 ' + cachedDate : ''} ${content.company ? ' • 🏢 ' + content.company : ''}</span>
+                <button onclick="triggerSWOT('${company}', '${targetContainerId}', null, true)" style="background:none; border:1px solid #cbd5e1; padding:2px 8px; border-radius:4px; cursor:pointer; color:#475569;">🔄 Force Refresh</button>
+            </div>`;
+
+                    res.innerHTML = html;
+                    console.log(`   🎉 Render Complete for ${containerId}`);
+                }
+
+                // ----------------------------------------------------
+                // ☁️ WORD CLOUD LOGIC
+                // ----------------------------------------------------
+                window.renderWordCloud = function () { // Expose to window for onchange
+                    const canvas = document.getElementById('wordcloud-canvas');
+                    if (!canvas || !window.WordCloud) return;
+
+                    // [NEW] Get Toggles
+                    // Check if elements exist (might not be rendered yet if early call)
+                    const chkOpenAI = document.getElementById('wc-openai');
+                    const chkAnthropic = document.getElementById('wc-anthropic');
+                    const chkMistral = document.getElementById('wc-mistral');
+
+                    const showOpenAI = chkOpenAI ? chkOpenAI.checked : true;
+                    const showAnthropic = chkAnthropic ? chkAnthropic.checked : true;
+                    const showMistral = chkMistral ? chkMistral.checked : true;
+
+                    // 1. Aggregate Text
+                    // Use currentData (filtered) + ftoData (internal) if needed
+                    // But usually currentData has everything relevant for the view.
+
+                    let words = {};
+
+                    // [NEW] Refined Text Extraction with Normalization
+                    // We use Frequency Density metric: (Count / DocLength) * 1000
+                    // This equalizes long Claims vs short Summaries.
+
+                    const stopWords = new Set([
+                        // English Pronouns & Filler
+                        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from", "up", "down", "is", "are", "was", "were", "be", "been", "has", "have", "had", "do", "does", "did", "can", "could", "should", "would", "will", "shall", "may", "might", "must", "which", "this", "that", "these", "those", "into", "onto", "through", "each", "other", "some", "any", "all", "more", "most", "less", "least", "then", "than", "there", "their", "they", "them", "your", "its", "it's", "where", "when", "how", "why", "who", "whom", "while",
+                        "again", "often", "like", "such", "rely", "within", "between", "across", "without", "specific", "particularly", "involves", "require", "include", "during", "already", "simply", "rather", "instead", "becomes", "becomes",
+
+                        // Patent Lexicon (Noise)
+                        "method", "system", "device", "apparatus", "processing", "data", "based", "using", "configured", "comprising", "via", "machine", "learning", "artificial", "intelligence", "model", "models", "invention", "summary", "openai", "anthropic", "mistral", "wherein", "said", "plurality", "least", "one", "first", "second", "third", "fourth", "fifth", "coupled", "unit", "module", "step", "associated", "example", "embodiment", "claim", "claimed", "thereof", "therein", "aspect", "aspects", "providing", "performing", "having", "including", "relating", "disclosure", "disclosed", "accordance", "further", "additional", "plural", "comprises", "corresponding", "respective",
+
+                        // Meta/Status & Dashboard residue (Deep Clean)
+                        "pending", "analysis", "solution", "problem", "lack", "technical", "innovation", "existing", "traditional", "current", "script", "mist", "2026", "user", "users", "result", "results", "generate", "generating", "generated", "capability", "capabilities", "enhanced", "improved", "leading", "leadng", "trained", "addressed", "efficient", "dynamically", "accuracy", "multiple", "require", "requires", "real", "often", "essential", "crucial", "fundamental", "critical", "related"
+                    ]);
+
+                    // Helper to add words with NORMALIZED WEIGHT
+                    const addText = (text, company, weightMultiplier = 1) => {
+                        if (!text) return;
+                        const tokens = text.toLowerCase().split(/[^a-z0-9]+/);
+                        const docLength = tokens.length || 1;
+
+                        tokens.forEach(t => {
+                            if (t.length < 4 || stopWords.has(t)) return; // Ignore < 4 chars
+                            if (!words[t]) words[t] = { count: 0, mistral: 0, openai: 0, anthropic: 0 };
+
+                            const score = (1 / docLength) * 1000 * weightMultiplier;
+                            words[t].count += score;
+
+                            if (company === 'OpenAI') words[t].openai += score;
+                            else if (company === 'Anthropic') words[t].anthropic += score;
+                            else if (company === 'Mistral' || company === 'Mistral (Internal)') words[t].mistral += score;
+                        });
+                    };
+
+                    // Process Market Data - [PRIORITY] Use AI Summary, fallback to Title
+                    // AI Summaries are much cleaner than CleanClaim
+                    currentData.forEach(d => {
+                        const text = (d.AISummary && d.AISummary.length > 20) ? d.AISummary : d.Title;
+                        addText(text, d.Company, 1.0);
+                    });
+
+                    // Process Internal Data (SUMMARIES)
+                    ftoData.forEach(d => {
+                        addText(d.summaryText, "Mistral", 1.0);
+                    });
+
+                    // 2. Format for WordCloud2
+                    // List of [word, size, color]
+                    let list = [];
+
+                    Object.keys(words).forEach(w => {
+                        const d = words[w];
+                        if (d.count < 2) return; // Filter noise
+
+                        // [FIX] Recalculate visibility based on toggles
+                        const effOpenAI = showOpenAI ? d.openai : 0;
+                        const effAnthropic = showAnthropic ? d.anthropic : 0;
+                        const effMistral = showMistral ? d.mistral : 0;
+
+                        const visibleTotal = effOpenAI + effAnthropic + effMistral;
+                        if (visibleTotal === 0) return;
+
+                        // Recalculate color based on effective counts
+                        let color = "#64748b"; // Default Grey (Common/Mixed)
+
+                        if (effOpenAI / visibleTotal > 0.6) color = "#2563eb"; // Blue
+                        else if (effAnthropic / visibleTotal > 0.6) color = "#dc2626"; // Red
+                        else if (effMistral / visibleTotal > 0.6) color = "#10b981"; // Green
+
+                        list.push([w, visibleTotal * 4, color]); // Use visibleTotal for sizing
+                    });
+
+                    // Sort by frequency
+                    list.sort((a, b) => b[1] - a[1]);
+                    list.sort((a, b) => b[1] - a[1]);
+                    list = list.slice(0, 150); // [FIX] Increase cap to 150 words
+
+                    // [NEW] Calculate Range for Sizing (1:5 ratio)
+                    const weights = list.map(i => i[1]);
+                    const minW = Math.min(...weights);
+                    const maxW = Math.max(...weights);
+                    const rangeW = maxW - minW || 1;
+
+                    // 3. Render
+                    WordCloud(canvas, {
+                        list: list,
+                        gridSize: 8,
+                        weightFactor: function (size) {
+                            // [FIX] Dynamic Linear Mapping (12px to 60px)
+                            // size is the weight (visibleTotal * 4) passed in the list
+                            const minSize = 12;
+                            const maxSize = 60;
+                            return minSize + ((size - minW) / rangeW) * (maxSize - minSize);
+                        },
+                        fontFamily: 'Inter, sans-serif',
+                        color: function (word, weight, fontSize, distance, theta) {
+                            // Find color from our list
+                            const item = list.find(i => i[0] === word);
+                            return item ? item[2] : "#64748b";
+                        },
+                        rotateRatio: 0, // All horizontal for readability
+                        backgroundColor: '#fff'
+                    });
+                }
+                // }; // Removed extra brace
+                // ----------------------------------------------------
+                // 8. RENDER CACHED REPORTS ON LOAD
+                // ----------------------------------------------------
+                // ----------------------------------------------------
+                // 8. RENDER CACHED REPORTS ON LOAD
+                // ----------------------------------------------------
+                window.renderCachedReports = function () {
+                    console.log("🔄 [SWOT] renderCachedReports called.");
+
+                    if (!window.cachedReports) {
+                        console.warn("⚠️ [SWOT] window.cachedReports is undefined or null.");
+                        return;
+                    }
+
+                    // Iterate over known keys with CORRECT IDs
+                    const mapping = {
+                        'SWOT_Mistral': { id: 'swot-result-mistral', company: 'Mistral' },
+                        'SWOT_OpenAI': { id: 'swot-result-openai', company: 'OpenAI' },
+                        'SWOT_Anthropic': { id: 'swot-result-anthropic', company: 'Anthropic' }
+                    };
+
+                    Object.keys(mapping).forEach(key => {
+                        const cache = window.cachedReports[key];
+                        if (cache && cache.content) {
+                            console.log(`      ✅ Found content for ${key}. Target: ${mapping[key].id}`);
+                            try {
+                                // Call renderSWOT with explicit ID
+                                renderSWOT(cache.content, mapping[key].id, cache.date, mapping[key].company);
+                            } catch (e) {
+                                console.error(`      ❌ Error rendering ${key}: ${e.message}`);
+                            }
+
+                            // Update button text
+                            const btnId = `btn-swot-${mapping[key].company.toLowerCase()}`;
+                            const btn = document.getElementById(btnId);
+                            if (btn) btn.innerText = `✨ Regenerate SWOT for ${mapping[key].company}`;
+                        } else {
+                            console.log(`      ℹ️ No content found for ${key}`);
+                        }
+                    });
+                };
+
+                // ----------------------------------------------------
+                // 🤖 STRATEGIC ANALYSIS LOGIC (MISTRAL LARGE)
+                // ----------------------------------------------------
+                // [REMOVED] Duplicate triggerStrategicReport (Robust version at 1702)
+
+                window.renderStrategicReport = function (data) {
+                    console.log("🎨 [STRATEGY] Rendering Report...", data);
+
+                    const container = document.getElementById('strategic-report-content');
+                    const statusSpan = document.getElementById('report-status');
+
+                    if (!container) return;
+
+                    if (!data || (!data.content && typeof data !== 'string')) {
+                        container.innerHTML = "<em>No data available.</em>";
+                        return;
+                    }
+
+                    let content = data.content || data;
+                    const date = data.date || "Just now";
+
+                    // 1. Handle Stringified JSON or Fallback
+                    if (typeof content === 'string' && content.trim().startsWith('{')) {
+                        try { content = JSON.parse(content); } catch (e) { console.warn("JSON Parse Error", e); }
+                    }
+
+                    // 2. STYLED SECTION RENDERER
+                    const renderSection = (title, body) => {
+                        const htmlContent = (typeof body === 'string') ? marked.parse(body) : JSON.stringify(body);
+                        return `
+                            <div style="margin-bottom:20px; background:white; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <div style="background:#f8fafc; padding:12px 18px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:10px;">
+                                    <h4 style="margin:0; font-weight:700; color:#1e293b; font-size:1rem;">${title}</h4>
+                                </div>
+                                <div style="padding:18px; color:#334155; line-height:1.6; font-size:0.95rem;">
+                                    ${htmlContent}
+                                </div>
+                            </div>`;
+                    };
+
+                    // 3. RENDER LOGIC
+                    let finalHtml = "";
+
+                    if (typeof content === 'object' && content.strategic_analysis) {
+                        const sa = content.strategic_analysis;
+                        // Use the titles from the AI or fallbacks
+                        const sections = [
+                            { key: 'key_strengths_mistral_dominance', default: "🛡️ Key Strengths" },
+                            { key: 'market_positioning', default: "⚖️ Market Positioning" },
+                            { key: 'critical_gaps', default: "⚔️ Critical Gaps & Risks" },
+                            { key: 'strategic_recommendation', default: "🚀 Recommendations" }
+                        ];
+
+                        sections.forEach(s => {
+                            const val = sa[s.key];
+                            if (val) {
+                                finalHtml += renderSection(val.title || s.default, val.content || val);
+                            }
+                        });
+                    }
+
+                    // Fallback to simple Markdown if not structured
+                    if (!finalHtml) {
+                        const text = (typeof content === 'string') ? content : JSON.stringify(content, null, 2);
+                        finalHtml = `<div class="prose max-w-none text-slate-700 p-4 bg-white border rounded-xl">${marked.parse(text)}</div>`;
+                    }
+
+                    container.innerHTML = finalHtml;
+                    if (statusSpan) statusSpan.innerText = `(Generated: ${date})`;
+                    console.log("   ✅ [STRATEGY] Rendered.");
+                }
+
+                // Call it once? The window.onload logic calls it.
+            })(); // Close IIFE
+        </script>
+
+
+</body>
+
+</html>
