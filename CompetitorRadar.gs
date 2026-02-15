@@ -58,10 +58,13 @@ function loadConsolidatedFTOAnalyses() {
   const file = getUniqueFile(folder, DETAILED_FTO_CACHE_FILENAME);
   if (!file) return {};
   try {
-    return JSON.parse(file.getBlob().getDataAsString());
+    const content = file.getBlob().getDataAsString();
+    if (!content || content.trim() === "") return {};
+    return JSON.parse(content);
   } catch (e) {
-    log("⚠️ Failed to parse Detailed FTO Cache: " + e.message);
-    return {};
+    log("❌ CRITICAL: Failed to parse Detailed FTO Cache: " + e.message);
+    // Return null instead of {} to signal an error (prevents overwriting valid data with empty)
+    return null; 
   }
 }
 
@@ -74,6 +77,12 @@ function saveConsolidatedFTOAnalysis(inventionId, patentId, score, claimsData) {
     lock.waitLock(15000); // Wait up to 15 seconds
     
     let cache = loadConsolidatedFTOAnalyses();
+    
+    // Safety check: If load failed (returned null), DO NOT save or we wipe the file
+    if (cache === null) {
+      log("   ❌ Aborting save to prevent data loss (Cache loading failed).");
+      return { success: false, error: "Cache load failed" };
+    }
     
     if (!cache[inventionId]) cache[inventionId] = {};
     
